@@ -1,0 +1,148 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String          @id @default(cuid())
+  email         String          @unique
+  passwordHash  String
+  role          UserRole
+  name          String
+  createdAt     DateTime        @default(now())
+  farmerProfile FarmerProfile?
+  buyerProfile  BuyerProfile?
+  produce       Produce[]
+  bulkOrders    BulkOrder[]
+  orders        Order[]
+  pools         FarmPool[]
+  notifications Notification[]
+}
+
+model FarmerProfile {
+  id        String @id @default(cuid())
+  userId    String @unique
+  location  String
+  farmName  String?
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model BuyerProfile {
+  id          String @id @default(cuid())
+  userId      String @unique
+  companyName String
+  location    String
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Produce {
+  id          String   @id @default(cuid())
+  farmerId    String
+  crop        String
+  quantityKg  Float
+  pricePerKg  Float
+  location    String
+  available   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  farmer      User     @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+  poolMembers  FarmPoolMember[]
+}
+
+model BulkOrder {
+  id                 String    @id @default(cuid())
+  buyerId            String
+  crop               String
+  requiredQuantityKg Float
+  maximumPricePerKg  Float
+  deliveryLocation   String
+  deliveryDate       DateTime
+  status             OrderStatus @default(OPEN)
+  createdAt          DateTime  @default(now())
+  buyer              User      @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  pool               FarmPool?
+}
+
+model FarmPool {
+  id              String          @id @default(cuid())
+  poolCode        String          @unique
+  bulkOrderId     String          @unique
+  buyerId         String
+  matchedQuantityKg Float
+  averagePricePerKg Float
+  status          PoolStatus      @default(MATCHING)
+  createdAt       DateTime        @default(now())
+  bulkOrder       BulkOrder       @relation(fields: [bulkOrderId], references: [id], onDelete: Cascade)
+  buyer           User            @relation(fields: [buyerId], references: [id])
+  members         FarmPoolMember[]
+  order           Order?
+}
+
+model FarmPoolMember {
+  id             String  @id @default(cuid())
+  farmPoolId     String
+  produceId      String
+  contributionKg Float
+  farmPool       FarmPool @relation(fields: [farmPoolId], references: [id], onDelete: Cascade)
+  produce        Produce  @relation(fields: [produceId], references: [id])
+  @@unique([farmPoolId, produceId])
+}
+
+model Order {
+  id          String      @id @default(cuid())
+  orderCode   String      @unique
+  buyerId     String
+  farmPoolId  String      @unique
+  status      OrderStatus @default(CREATED)
+  createdAt   DateTime    @default(now())
+  buyer       User        @relation(fields: [buyerId], references: [id])
+  farmPool    FarmPool    @relation(fields: [farmPoolId], references: [id])
+  items       OrderItem[]
+}
+
+model OrderItem {
+  id          String @id @default(cuid())
+  orderId     String
+  crop        String
+  quantityKg  Float
+  pricePerKg  Float
+  order       Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  body      String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum UserRole {
+  FARMER
+  BUYER
+}
+
+enum PoolStatus {
+  MATCHING
+  FULFILLED
+  COLLECTION
+  CONSOLIDATED
+  COMPLETED
+}
+
+enum OrderStatus {
+  OPEN
+  CREATED
+  MATCHED
+  POOL_CREATED
+  COLLECTION
+  CONSOLIDATION
+  DISPATCHED
+  DELIVERED
+  COMPLETED
+}

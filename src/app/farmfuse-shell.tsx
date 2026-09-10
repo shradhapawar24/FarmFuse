@@ -1,178 +1,1763 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   ArrowRight,
-  BarChart3,
-  Bell,
-  Boxes,
   Check,
-  ChevronRight,
-  CircleDollarSign,
+  ChevronDown,
+  CircleUserRound,
   ClipboardList,
-  CloudSun,
-  Factory,
+  Globe2,
   Leaf,
+  LogIn,
+  MapPin,
   Menu,
   Package,
+  Pause,
+  Pencil,
   Plus,
-  Route,
-  Settings,
-  ShieldCheck,
-  ShoppingCart,
+  Search,
+  ShoppingBasket,
   Sprout,
+  Trash2,
   Truck,
+  UserPlus,
   Users,
   X,
   Zap,
 } from "lucide-react";
 
-type Role = "buyer" | "farmer";
-type View = "overview" | "matching" | "pools" | "produce" | "prices" | "logistics" | "orders" | "insights" | "profile";
-type Farmer = { id: string; name: string; location: string; crop: string; quantity: number; price: number; color: string };
-type Pool = { id: string; crop: string; required: number; matched: number; farmers: number; createdAt: string };
-type MatchedFarmer = Farmer & { contribution: number };
+type Role = "farmer" | "buyer";
+type Language = "en" | "hi" | "mr";
+type View = "home" | "market" | "sell" | "orders" | "track" | "intelligence";
+type Listing = {
+  id: string;
+  crop: string;
+  quantity: number;
+  price: number;
+  location: string;
+  farmer: string;
+  ready: string;
+  available: boolean;
+};
+type RequirementItem = { crop: string; quantity: number };
+type FarmOrder = {
+  id: string;
+  trackingId: string;
+  items: RequirementItem[];
+  farmers: string[];
+  total: number;
+  status: number;
+  date: string;
+};
+type CartItem = { listing: Listing; quantity: number };
 
-const farmers: Farmer[] = [
-  { id: "a", name: "Arjun Patil", location: "Nashik, MH", crop: "Tomato", quantity: 150, price: 22, color: "#e77850" },
-  { id: "b", name: "Meera Shinde", location: "Dhule, MH", crop: "Tomato", quantity: 200, price: 23, color: "#e8b84b" },
-  { id: "c", name: "Suresh Jadhav", location: "Jalgaon, MH", crop: "Tomato", quantity: 300, price: 21, color: "#77a85d" },
-  { id: "d", name: "Kavita More", location: "Nandurbar, MH", crop: "Tomato", quantity: 350, price: 24, color: "#77a7a1" },
+const crops = [
+  "Tomato",
+  "Potato",
+  "Onion",
+  "Carrot",
+  "Cabbage",
+  "Cauliflower",
+  "Brinjal",
+  "Okra",
+  "Capsicum",
+  "Green Chilli",
+  "Peas",
+  "Spinach",
+  "Cucumber",
+  "Pumpkin",
+  "Coriander",
+  "Garlic",
+  "Ginger",
+  "Beetroot",
+  "Radish",
 ];
-const nav: { label: string; view: View; icon: typeof BarChart3; roles: Role[] }[] = [
-  { label: "Overview", view: "overview", icon: BarChart3, roles: ["buyer", "farmer"] },
-  { label: "AI matching", view: "matching", icon: Zap, roles: ["buyer", "farmer"] },
-  { label: "Farm pools", view: "pools", icon: Users, roles: ["buyer", "farmer"] },
-  { label: "My produce", view: "produce", icon: Package, roles: ["farmer"] },
-  { label: "Price intelligence", view: "prices", icon: CircleDollarSign, roles: ["buyer"] },
-  { label: "Smart logistics", view: "logistics", icon: Truck, roles: ["buyer"] },
-  { label: "Order tracking", view: "orders", icon: ClipboardList, roles: ["buyer", "farmer"] },
-  { label: "Market insights", view: "insights", icon: CloudSun, roles: ["buyer", "farmer"] },
+const cropIcons: Record<string, string> = {
+  Tomato: "🍅",
+  Potato: "🥔",
+  Onion: "🧅",
+  Carrot: "🥕",
+  Cabbage: "🥬",
+  Cauliflower: "🥦",
+  Brinjal: "🍆",
+  Okra: "🫛",
+  Capsicum: "🫑",
+  "Green Chilli": "🌶️",
+  Peas: "🫛",
+  Spinach: "🌿",
+  Cucumber: "🥒",
+  Pumpkin: "🎃",
+  Coriander: "🌿",
+  Garlic: "🧄",
+  Ginger: "🫚",
+  Beetroot: "🫒",
+  Radish: "🥕",
+};
+const seedListings: Listing[] = [
+  {
+    id: "seed-1",
+    crop: "Tomato",
+    quantity: 4200,
+    price: 24,
+    location: "Nashik, Maharashtra",
+    farmer: "Arjun Patil",
+    ready: "Today",
+    available: true,
+  },
+  {
+    id: "seed-2",
+    crop: "Potato",
+    quantity: 5100,
+    price: 22,
+    location: "Dhule, Maharashtra",
+    farmer: "Meera Shinde",
+    ready: "18 Sep",
+    available: true,
+  },
+  {
+    id: "seed-3",
+    crop: "Onion",
+    quantity: 3900,
+    price: 26,
+    location: "Jalgaon, Maharashtra",
+    farmer: "Suresh Jadhav",
+    ready: "19 Sep",
+    available: true,
+  },
+  {
+    id: "seed-4",
+    crop: "Carrot",
+    quantity: 2400,
+    price: 30,
+    location: "Nandurbar, Maharashtra",
+    farmer: "Kavita More",
+    ready: "Tomorrow",
+    available: true,
+  },
+  {
+    id: "seed-5",
+    crop: "Cabbage",
+    quantity: 1800,
+    price: 20,
+    location: "Pune, Maharashtra",
+    farmer: "Rohan Deshmukh",
+    ready: "20 Sep",
+    available: true,
+  },
+  {
+    id: "seed-6",
+    crop: "Cauliflower",
+    quantity: 2600,
+    price: 29,
+    location: "Aurangabad, Maharashtra",
+    farmer: "Priya Raut",
+    ready: "21 Sep",
+    available: true,
+  },
 ];
+const copy = {
+  en: {
+    home: "Home",
+    market: "Buy Produce",
+    sell: "Sell Produce",
+    intelligence: "Intelligence",
+    login: "Login / Profile",
+    hero: "Sell Direct. Buy Direct. Grow Together.",
+    heroText:
+      "FarmFuse connects farmers and FPOs directly with consumers and bulk buyers, then quietly handles matching, collection and logistics behind the scenes.",
+    sellNow: "I have vegetables to sell",
+    buyNow: "I want to buy vegetables",
+    publish: "Publish for buyers",
+    stock: "Your farm today",
+    buying: "Your buying space",
+    add: "Add produce",
+    orders: "Orders",
+    match: "Find farmers",
+    pool: "Create Farm Pool",
+    search: "Search vegetables, farms or locations",
+    direct: "A shorter route from field to table",
+  },
+  hi: {
+    home: "होम",
+    market: "उपज खरीदें",
+    sell: "उपज बेचें",
+    intelligence: "बुद्धिमत्ता",
+    login: "लॉगिन / प्रोफ़ाइल",
+    hero: "सीधे बेचें। सीधे खरीदें। साथ बढ़ें।",
+    heroText:
+      "FarmFuse किसानों और FPO को उपभोक्ताओं व थोक खरीदारों से जोड़ता है और मिलान, संग्रह व लॉजिस्टिक्स को आसान बनाता है।",
+    sellNow: "मेरे पास सब्ज़ियां हैं",
+    buyNow: "मुझे सब्ज़ियां खरीदनी हैं",
+    publish: "खरीदारों के लिए प्रकाशित करें",
+    stock: "आज का आपका खेत",
+    buying: "आपकी खरीदारी",
+    add: "उपज जोड़ें",
+    orders: "ऑर्डर",
+    match: "किसान खोजें",
+    pool: "Farm Pool बनाएं",
+    search: "सब्ज़ी, खेत या जगह खोजें",
+    direct: "खेत से थाली तक छोटा रास्ता",
+  },
+  mr: {
+    home: "मुख्यपृष्ठ",
+    market: "माल खरेदी",
+    sell: "माल विक्री",
+    intelligence: "हुशारी",
+    login: "लॉगिन / प्रोफाइल",
+    hero: "थेट विका. थेट खरेदी करा. एकत्र वाढा.",
+    heroText:
+      "FarmFuse शेतकरी आणि FPO यांना ग्राहक व मोठ्या खरेदीदारांशी जोडते. जुळवणी, संकलन आणि वाहतूक सोपी होते.",
+    sellNow: "माझ्याकडे भाजीपाला आहे",
+    buyNow: "मला भाजीपाला खरेदी करायचा आहे",
+    publish: "खरेदीदारांसाठी प्रकाशित करा",
+    stock: "आजचे तुमचे शेत",
+    buying: "तुमची खरेदी",
+    add: "माल जोडा",
+    orders: "ऑर्डर",
+    match: "शेतकरी शोधा",
+    pool: "Farm Pool तयार करा",
+    search: "भाजी, शेत किंवा ठिकाण शोधा",
+    direct: "शेतापासून ताटापर्यंत छोटा मार्ग",
+  },
+};
 
-function matchSupply(required: number) {
-  let remaining = required;
-  return farmers.flatMap((farmer) => {
-    if (remaining <= 0) return [];
-    const contribution = Math.min(remaining, farmer.quantity);
-    remaining -= contribution;
-    return [{ ...farmer, contribution }];
-  });
-}
-
+type Copy = typeof copy.en;
 export default function FarmFuseShell() {
-  const [role, setRole] = useState<Role>("buyer");
-  const [view, setView] = useState<View>("overview");
-  const [quantity, setQuantity] = useState(1000);
-  const [pools, setPools] = useState<Pool[]>(() => {
-    if (typeof window === "undefined") return [];
-    const saved = window.localStorage.getItem("farmfuse-pools");
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [showLogin, setShowLogin] = useState(false);
-  const [mobileNav, setMobileNav] = useState(false);
-  const [toast, setToast] = useState("");
-  const [produce, setProduce] = useState(farmers);
-
-  const localSelection = useMemo(() => matchSupply(quantity), [quantity]);
-  const [serverSelection, setServerSelection] = useState<MatchedFarmer[] | null>(null);
-  const selection = serverSelection ?? localSelection;
-
-  useEffect(() => {
-    void fetch(`/api/matching?quantity=${quantity}`)
-      .then((response) => response.ok ? response.json() : null)
-      .then((data) => { if (data?.selected) setServerSelection(data.selected); })
-      .catch(() => undefined);
-  }, [quantity]);
-  const matched = selection.reduce((sum, item) => sum + item.contribution, 0);
-  const remaining = Math.max(quantity - matched, 0);
-  const fulfillment = quantity ? Math.round((matched / quantity) * 100) : 0;
-  const averagePrice = matched ? selection.reduce((sum, item) => sum + item.contribution * item.price, 0) / matched : 0;
-
-  async function createPool() {
-    const pool = { id: `FP-${String(pools.length + 1001)}`, crop: "Tomato", required: quantity, matched, farmers: selection.length, createdAt: new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short" }) };
+  const [language, setLanguage] = useState<Language>("en");
+  const [role, setRole] = useState<Role | null>(null);
+  const [userName, setUserName] = useState("");
+  const [view, setView] = useState<View>("home");
+  const [authOpen, setAuthOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<"login" | "register">("login");
+  const [listings, setListings] = useState<Listing[]>(() => {
     try {
-      const orderResponse = await fetch("/api/orders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ crop: "Tomato", quantity, maximumPrice: 32, deliveryLocation: "Dhule", deliveryDate: "2026-09-18" }) });
-      if (!orderResponse.ok) throw new Error("order");
-      const orderData = await orderResponse.json();
-      const poolResponse = await fetch("/api/pools", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ quantity, matched, averagePrice, selected: selection, bulkOrderId: orderData.order?.id }) });
-      if (!poolResponse.ok) throw new Error("pool");
+      return typeof window === "undefined"
+        ? seedListings
+        : JSON.parse(
+            localStorage.getItem("farmfuse-listings") ||
+              JSON.stringify(seedListings),
+          );
     } catch {
-      setToast("Saved in demo mode; connect DATABASE_URL for hosted persistence");
+      return seedListings;
     }
-    const next = [pool, ...pools];
-    setPools(next);
-    window.localStorage.setItem("farmfuse-pools", JSON.stringify(next));
-    setToast(`${pool.id} created with ${selection.length} participating farmers`);
-    setView("pools");
-  }
-
-  async function addProduce() {
-    const next = { id: `new-${Date.now()}`, name: "Your new listing", location: "Your farm", crop: "Tomato", quantity: 100, price: 25, color: "#9aa89a" };
+  });
+  const [orders, setOrders] = useState<FarmOrder[]>(() => {
     try {
-      const response = await fetch("/api/produce", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ crop: next.crop, quantity: next.quantity, price: next.price }) });
-      const data = await response.json();
-      if (data.produce?.id) next.id = data.produce.id;
-    } catch { setToast("Saved in demo mode; connect DATABASE_URL for hosted persistence"); }
-    setProduce([...produce, next]);
-    setToast("Produce listing added");
+      return typeof window === "undefined"
+        ? []
+        : JSON.parse(localStorage.getItem("farmfuse-orders") || "[]");
+    } catch {
+      return [];
+    }
+  });
+  const [requirement, setRequirement] = useState<RequirementItem[]>([
+    { crop: "Tomato", quantity: 100 },
+    { crop: "Potato", quantity: 200 },
+    { crop: "Onion", quantity: 150 },
+  ]);
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [toast, setToast] = useState("");
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [selectedTracking, setSelectedTracking] = useState("");
+  const t = copy[language];
+  useEffect(() => {
+    localStorage.setItem("farmfuse-listings", JSON.stringify(listings));
+  }, [listings]);
+  useEffect(() => {
+    localStorage.setItem("farmfuse-orders", JSON.stringify(orders));
+  }, [orders]);
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(""), 2600);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+  const visibleListings = useMemo(
+    () =>
+      listings.filter(
+        (item) =>
+          item.available &&
+          `${item.crop} ${item.location} ${item.farmer}`
+            .toLowerCase()
+            .includes(search.toLowerCase()),
+      ),
+    [listings, search],
+  );
+  const activeOrder =
+    orders.find((item) => item.trackingId === selectedTracking) || orders[0];
+  function navigate(next: View) {
+    setView(next);
+    setMobileOpen(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
-
-  async function removeProduce(id: string) {
-    setProduce(produce.filter((item) => item.id !== id));
-    try { await fetch(`/api/produce?id=${encodeURIComponent(id)}`, { method: "DELETE" }); } catch { setToast("Removed locally in demo mode"); }
+  function goBack() {
+    if (view === "track") navigate("orders");
+    else navigate("home");
   }
-
-  const activeNav = nav.filter((item) => item.roles.includes(role));
-
+  function addOrder(items = requirement) {
+    const total = items.reduce((sum, item) => sum + item.quantity, 0);
+    const farmers = visibleListings
+      .filter((listing) => items.some((item) => item.crop === listing.crop))
+      .slice(0, 4)
+      .map((item) => item.farmer);
+    const order = {
+      id: `order-${Date.now()}`,
+      trackingId: `FF-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
+      items,
+      farmers,
+      total,
+      status: 2,
+      date: new Date().toISOString(),
+    };
+    setOrders((current) => [order, ...current]);
+    setSelectedTracking(order.trackingId);
+    setToast(`Order placed. Tracking ID ${order.trackingId}`);
+    navigate("track");
+  }
+  if (!role)
+    return (
+      <>
+        <Landing
+          t={t}
+          language={language}
+          setLanguage={setLanguage}
+          onAuth={(mode) => {
+            setAuthMode(mode);
+            setAuthOpen(true);
+          }}
+          onMarketplace={() => {
+            setAuthMode("login");
+            setAuthOpen(true);
+          }}
+        />
+        {authOpen && (
+          <AuthModal
+            mode={authMode}
+            onClose={() => setAuthOpen(false)}
+            onSuccess={(nextRole, name) => {
+              setRole(nextRole);
+              setUserName(name);
+              setAuthOpen(false);
+              navigate(nextRole === "farmer" ? "sell" : "market");
+            }}
+          />
+        )}
+      </>
+    );
   return (
-    <div className="app-shell">
-      <aside className={`sidebar ${mobileNav ? "sidebar-open" : ""}`}>
-        <div className="brand"><div className="brand-mark"><Sprout size={19} /></div><span>farm<span>fuse</span></span></div>
-        <div className="workspace-label">WORKSPACE</div>
-        <div className="role-switcher">
-          <button className={role === "buyer" ? "active" : ""} onClick={() => { setRole("buyer"); setView("overview"); }}>Buyer</button>
-          <button className={role === "farmer" ? "active" : ""} onClick={() => { setRole("farmer"); setView("overview"); }}>Farmer</button>
+    <div className="site-shell">
+      <header className="navbar">
+        <button className="brand" onClick={() => navigate("home")}>
+          <span className="brand-icon">
+            <Sprout size={18} />
+          </span>
+          <span>
+            farm<span>fuse</span>
+          </span>
+        </button>
+        <button
+          className="mobile-menu"
+          aria-label="Open navigation"
+          onClick={() => setMobileOpen(!mobileOpen)}
+        >
+          <Menu />
+        </button>
+        <nav className={mobileOpen ? "nav-links open" : "nav-links"}>
+          <button onClick={() => navigate("home")}>{t.home}</button>
+          {role === "buyer" && (
+            <button onClick={() => navigate("market")}>{t.market}</button>
+          )}
+          {role === "farmer" && (
+            <>
+              <button onClick={() => navigate("sell")}>{t.sell}</button>
+              <button onClick={() => navigate("intelligence")}>{t.intelligence}</button>
+            </>
+          )}
+          <button onClick={() => navigate("orders")}>
+            {role === "farmer" ? "Farmer orders" : t.orders}
+          </button>
+        </nav>
+        <div className="nav-actions">
+          <label className="language">
+            <Globe2 size={15} />
+            <select
+              value={language}
+              onChange={(event) => setLanguage(event.target.value as Language)}
+            >
+              <option value="en">English</option>
+              <option value="hi">हिंदी</option>
+              <option value="mr">मराठी</option>
+            </select>
+          </label>
+          {role === "buyer" && (
+            <button className="cart-button" onClick={() => navigate("market")}>
+              Cart <b>{cart.length}</b>
+            </button>
+          )}
+          <button
+            className="profile-button"
+            onClick={() => {
+              setRole(null);
+              setUserName("");
+              setView("home");
+            }}
+          >
+            <CircleUserRound size={17} /> {userName || "Profile"}
+          </button>
         </div>
-        <nav className="sidebar-nav">{activeNav.map((item) => { const Icon = item.icon; return <button key={item.view} className={view === item.view ? "selected" : ""} onClick={() => { setView(item.view); setMobileNav(false); }}><Icon size={17} /><span>{item.label}</span>{view === item.view && <ChevronRight size={14} className="nav-arrow" />}</button>; })}</nav>
-        <div className="sidebar-spacer" />
-        <button className="sidebar-link" onClick={() => setView("profile")}><Settings size={17} /> Profile & settings</button>
-        <div className="account-chip"><div className="avatar">{role === "buyer" ? "NK" : "AP"}</div><div><strong>{role === "buyer" ? "Narmada Foods" : "Arjun Patil"}</strong><small>{role === "buyer" ? "Verified buyer" : "Verified farmer"}</small></div><ChevronRight size={15} /></div>
-      </aside>
-      {mobileNav && <button className="mobile-scrim" aria-label="Close menu" onClick={() => setMobileNav(false)} />}
-      <main className="main-content">
-        <header className="topbar"><button className="icon-button menu-button" onClick={() => setMobileNav(true)} aria-label="Open navigation"><Menu size={20} /></button><div className="crumb"><span>Workspace</span><ChevronRight size={14} /><strong>{nav.find((item) => item.view === view)?.label ?? "Profile"}</strong></div><div className="top-actions"><span className="live-dot"><i /> Demo environment</span><button className="quiet-button" onClick={() => setShowLogin(true)}>Sign in</button><button className="icon-button" aria-label="Notifications" onClick={() => setToast("You have 3 new notifications")}><Bell size={18} /><b>3</b></button><button className="top-avatar" onClick={() => setView("profile")}>{role === "buyer" ? "NK" : "AP"}</button></div></header>
-        <div className="page-wrap">
-          {view === "overview" && <Overview role={role} matched={matched} fulfillment={fulfillment} pools={pools} onMatch={() => setView("matching")} onViewPools={() => setView("pools")} />}
-          {view === "matching" && <Matching quantity={quantity} setQuantity={setQuantity} selection={selection} matched={matched} remaining={remaining} fulfillment={fulfillment} averagePrice={averagePrice} onCreatePool={createPool} />}
-          {view === "pools" && <Pools pools={pools} onMatch={() => setView("matching")} />}
-          {view === "produce" && <Produce produce={produce} onAdd={addProduce} onDelete={removeProduce} />}
-          {view === "prices" && <Prices />}
-          {view === "logistics" && <Logistics matched={matched} farmers={selection.length} />}
-          {view === "orders" && <Orders fulfillment={fulfillment} />}
-          {view === "insights" && <Insights />}
-          {view === "profile" && <Profile role={role} />}
-        </div>
+      </header>
+      <main>
+        {view !== "home" && (
+          <button className="back-button" onClick={goBack}>
+            <ArrowRight size={15} /> Back
+          </button>
+        )}
+        {view === "home" && <Home t={t} role={role} onNavigate={navigate} />}{" "}
+        {view === "market" && role === "buyer" && (
+          <Marketplace
+            t={t}
+            listings={visibleListings}
+            search={search}
+            setSearch={setSearch}
+            cart={cart}
+            onAddCart={(listing) => {
+              setCart((items) =>
+                items.some((item) => item.listing.id === listing.id)
+                  ? items.map((item) =>
+                      item.listing.id === listing.id
+                        ? { ...item, quantity: item.quantity + 50 }
+                        : item,
+                    )
+                  : [...items, { listing, quantity: 50 }],
+              );
+              setToast(`${listing.crop} added to cart.`);
+            }}
+            onCheckout={() => {
+              addOrder(
+                cart.map((item) => ({
+                  crop: item.listing.crop,
+                  quantity: item.quantity,
+                })),
+              );
+              setCart([]);
+            }}
+            onBulk={(crop) => {
+              setRequirement((items) =>
+                items.some((item) => item.crop === crop)
+                  ? items
+                  : [...items, { crop, quantity: 100 }],
+              );
+              navigate("orders");
+            }}
+          />
+        )}{" "}
+        {view === "sell" && role === "farmer" && (
+          <Sell
+            t={t}
+            listings={listings}
+            setListings={setListings}
+            setToast={setToast}
+            onOrders={() => navigate("orders")}
+          />
+        )}{" "}
+        {view === "orders" && (
+          <Orders
+            t={t}
+            role={role}
+            requirement={requirement}
+            setRequirement={setRequirement}
+            onMatch={() => setToast("Smart matching found 4 suitable farmers.")}
+            onPool={() => addOrder()}
+          />
+        )}{" "}
+        {view === "track" && (
+          <Tracking
+            order={activeOrder}
+            onAdvance={() => {
+              if (!activeOrder) return;
+              setOrders((items) =>
+                items.map((item) =>
+                  item.id === activeOrder.id
+                    ? { ...item, status: Math.min(6, item.status + 1) }
+                    : item,
+                ),
+              );
+            }}
+          />
+        )}{" "}
+        {view === "intelligence" && role === "farmer" && <Intelligence />}
       </main>
-      {toast && <div className="toast"><Check size={16} /> {toast}<button onClick={() => setToast("")} aria-label="Dismiss"><X size={15} /></button></div>}
-      {showLogin && <div className="modal-scrim" onClick={() => setShowLogin(false)}><div className="login-modal" onClick={(event) => event.stopPropagation()}><button className="modal-close" onClick={() => setShowLogin(false)}><X size={18} /></button><div className="brand modal-brand"><div className="brand-mark"><Sprout size={19} /></div><span>farm<span>fuse</span></span></div><h2>Welcome back</h2><p>Sign in to your FarmFuse workspace.</p><input placeholder="Email address" defaultValue={role === "buyer" ? "buyer@farmfuse.demo" : "farmer@farmfuse.demo"} /><input placeholder="Password" type="password" defaultValue="FarmFuse123" /><button className="primary-button full" onClick={async () => { const email = role === "buyer" ? "buyer@farmfuse.demo" : "farmer@farmfuse.demo"; const response = await fetch("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password: "FarmFuse123" }) }); setShowLogin(false); setToast(response.ok ? "Signed in to demo workspace" : "Unable to sign in"); }}>Sign in <ArrowRight size={16} /></button><small>Demo credentials are prefilled for your presentation.</small></div></div>}
+      <footer>
+        <div className="brand">
+          <span className="brand-icon">
+            <Leaf size={17} />
+          </span>
+          <span>
+            farm<span>fuse</span>
+          </span>
+        </div>
+        <span>Farmers and buyers, growing together.</span>
+      </footer>
+      {toast && (
+        <div className="toast">
+          <Check size={16} />
+          {toast}
+          <button onClick={() => setToast("")}>
+            <X size={14} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
 
-function PageIntro({ eyebrow, title, text, action }: { eyebrow: string; title: string; text: string; action?: React.ReactNode }) { return <div className="page-intro"><div><div className="eyebrow">{eyebrow}</div><h1>{title}</h1><p>{text}</p></div>{action}</div>; }
-function Stat({ label, value, detail, tone = "green", icon: Icon }: { label: string; value: string; detail: string; tone?: string; icon: typeof BarChart3 }) { return <div className="stat-card"><div className={`stat-icon ${tone}`}><Icon size={18} /></div><div><span>{label}</span><strong>{value}</strong><small>{detail}</small></div></div>; }
-function Overview({ role, matched, fulfillment, pools, onMatch, onViewPools }: { role: Role; matched: number; fulfillment: number; pools: Pool[]; onMatch: () => void; onViewPools: () => void }) { return <><PageIntro eyebrow="Good morning, {role === 'buyer' ? 'Narmada Foods' : 'Arjun'}" title={role === "buyer" ? "Turn demand into momentum." : "Your harvest has a bigger market."} text={role === "buyer" ? "Coordinate the right supply, at the right price, from a single workspace." : "See where your produce can join a larger, better-paying order."} action={<button className="primary-button" onClick={onMatch}><Zap size={16} /> Run AI matching</button>} /><div className="stat-grid"><Stat label={role === "buyer" ? "Active orders" : "Available produce"} value={role === "buyer" ? "04" : "700 kg"} detail={role === "buyer" ? "+2 this month" : "Across 3 crops"} icon={role === "buyer" ? ShoppingCart : Package} /><Stat label="Farm pool participation" value={pools.length ? String(pools.length).padStart(2, "0") : "01"} detail="100% fulfilled" tone="amber" icon={Users} /><Stat label={role === "buyer" ? "Estimated savings" : "Expected earnings"} value={role === "buyer" ? "₹8,420" : "₹18,900"} detail="vs. spot market" tone="blue" icon={CircleDollarSign} /><Stat label="Fulfillment rate" value={`${fulfillment || 100}%`} detail="Last 30 days" tone="coral" icon={ShieldCheck} /></div><div className="dashboard-grid"><div className="feature-panel match-panel"><div className="panel-heading"><div><span className="eyebrow">Hero workflow</span><h2>Tomato order is ready to pool</h2></div><span className="status-pill success"><i /> Matching available</span></div><div className="order-summary"><div className="crop-orb">🍅</div><div><strong>BO-1001 · Tomato</strong><span>Dhule delivery hub · 18 Sep 2026</span></div><div className="summary-quantity"><strong>1,000 kg</strong><span>required quantity</span></div></div><div className="progress-meta"><span>Supply coverage</span><strong>{matched || 1000} / 1,000 kg</strong></div><div className="progress-track"><i style={{ width: `${Math.min(fulfillment || 100, 100)}%` }} /></div><button className="text-button" onClick={onMatch}>Open matching workspace <ArrowRight size={15} /></button></div><div className="side-panel"><div className="panel-heading"><h3>Recent activity</h3><button className="quiet-button" onClick={onViewPools}>View all</button></div><Activity icon={<Check size={15} />} color="green" title="Pool FP-1001 fulfilled" detail="4 farmers · just now" /><Activity icon={<Truck size={15} />} color="amber" title="Collection hub confirmed" detail="Dhule Hub · today" /><Activity icon={<CircleDollarSign size={15} />} color="blue" title="Price insight refreshed" detail="Tomato · 2h ago" /></div></div><div className="section-heading"><div><span className="eyebrow">Make it tangible</span><h2>How FarmFuse brings it together</h2></div><span className="muted-label">Illustrative demo workflow</span></div><div className="flow-strip"><FlowStep number="01" icon={<ShoppingCart size={19} />} title="Buyer demand" text="Create one clear bulk requirement" /><div className="flow-line" /><FlowStep number="02" icon={<Zap size={19} />} title="AI matching" text="Find the best supply combination" /><div className="flow-line" /><FlowStep number="03" icon={<Boxes size={19} />} title="FarmFuse Pool" text="Coordinate contributions together" /><div className="flow-line" /><FlowStep number="04" icon={<Factory size={19} />} title="Consolidate" text="One shipment, direct to buyer" /></div></> }
-function Activity({ icon, color, title, detail }: { icon: React.ReactNode; color: string; title: string; detail: string }) { return <div className="activity"><span className={`activity-icon ${color}`}>{icon}</span><div><strong>{title}</strong><small>{detail}</small></div><ChevronRight size={14} /></div> }
-function FlowStep({ number, icon, title, text }: { number: string; icon: React.ReactNode; title: string; text: string }) { return <div className="flow-step"><span className="step-number">{number}</span><div className="flow-icon">{icon}</div><strong>{title}</strong><span>{text}</span></div> }
-function Matching({ quantity, setQuantity, selection, matched, remaining, fulfillment, averagePrice, onCreatePool }: { quantity: number; setQuantity: (value: number) => void; selection: (Farmer & { contribution: number })[]; matched: number; remaining: number; fulfillment: number; averagePrice: number; onCreatePool: () => void }) { return <><PageIntro eyebrow="AI-assisted optimization prototype" title="Build a stronger supply chain." text="Transparent matching that shows exactly how every farmer contributes to a buyer's requirement." action={<div className="demo-badge"><span>Prototype</span> Rule-based optimization</div>} /><div className="matching-layout"><div className="matching-main"><div className="requirement-card"><div className="requirement-top"><div><span className="eyebrow">Buyer requirement</span><h2><span>🍅</span> Tomato</h2><p>Delivery to Dhule collection hub · 18 Sep 2026</p></div><div className="quantity-editor"><label>Required quantity</label><div><input type="number" min="1" value={quantity} onChange={(event) => setQuantity(Math.max(1, Number(event.target.value)))} /><b>kg</b></div><small>Try 500, 750 or 1,200 kg</small></div></div><div className="requirement-metrics"><div><span>Matched</span><strong>{matched.toLocaleString()} kg</strong></div><div><span>Remaining</span><strong className={remaining ? "warn-text" : ""}>{remaining.toLocaleString()} kg</strong></div><div><span>Fulfillment</span><strong className="green-text">{fulfillment}%</strong></div><div><span>Avg. farmer price</span><strong>₹{averagePrice.toFixed(2)}<small>/kg</small></strong></div></div></div><div className="matching-header"><div><span className="eyebrow">Supply candidates</span><h2>Selected farmers</h2></div><span className="candidate-count">{selection.length} candidates selected</span></div><div className="farmer-list">{selection.map((farmer, index) => <div className="farmer-row" key={farmer.id}><div className="farmer-index">0{index + 1}</div><div className="farmer-avatar" style={{ background: farmer.color }}>{farmer.name.split(" ").map((part) => part[0]).join("")}</div><div className="farmer-info"><strong>{farmer.name}</strong><span>{farmer.location} · {farmer.crop}</span></div><div className="contribution"><strong>{farmer.contribution} kg</strong><span>contribution</span></div><div className="price"><strong>₹{farmer.price}</strong><span>/ kg</span></div><div className="row-check"><Check size={15} /></div></div>)}{!selection.length && <div className="empty-state">No compatible supply found for this crop.</div>}</div><div className="matching-explanation"><div className="explain-icon"><Zap size={17} /></div><div><strong>Why these farmers?</strong><p>The prototype prioritizes crop compatibility, then selects available quantities in ascending price order until the requirement is met. This keeps the result explainable and fair.</p></div></div>{matched >= quantity && <button className="primary-button pool-button" onClick={onCreatePool}><Users size={17} /> Create Farm Pool <ArrowRight size={16} /></button>}</div><aside className="matching-aside"><div className="aside-card visual-pool"><div className="eyebrow">Live pool preview</div><div className="pool-visual"><div className="node-stack">{selection.map((farmer) => <span key={farmer.id} style={{ background: farmer.color }}>{farmer.name.charAt(0)}</span>)}</div><div className="pool-connector" /><div className="pool-destination"><div><Boxes size={22} /></div><strong>FarmFuse<br />Pool</strong></div><div className="pool-connector" /><div className="buyer-node"><ShoppingCart size={19} /><span>Bulk buyer</span></div></div><div className="pool-result"><strong>{matched.toLocaleString()} kg</strong><span>{fulfillment}% fulfilled</span></div></div><div className="aside-card checklist"><div className="panel-heading"><h3>Matching signals</h3><ShieldCheck size={18} /></div><Signal label="Crop compatibility" value="100%" /><Signal label="Price within limit" value="Yes" /><Signal label="Location suitability" value="High" /><Signal label="Supply sufficiency" value={remaining ? "Shortfall" : "Complete"} warning={Boolean(remaining)} /></div></aside></div></> }
-function Signal({ label, value, warning }: { label: string; value: string; warning?: boolean }) { return <div className="signal"><span>{label}</span><strong className={warning ? "warn-text" : "green-text"}>{!warning && <Check size={13} />}{value}</strong></div> }
-function Pools({ pools, onMatch }: { pools: Pool[]; onMatch: () => void }) { const allPools = pools.length ? pools : [{ id: "FP-1001", crop: "Tomato", required: 1000, matched: 1000, farmers: 4, createdAt: "Today" }]; return <><PageIntro eyebrow="Shared supply, stronger outcomes" title="Farm Pools" text="A transparent view of farmers coordinated around one buyer requirement." action={<button className="primary-button" onClick={onMatch}><Plus size={16} /> New pool</button>} /><div className="pool-hero"><div><span className="eyebrow">Active pool · {allPools[0].id}</span><h2>🍅 Tomato · Dhule collection</h2><p>Direct fulfillment for Narmada Foods</p></div><div className="pool-hero-stat"><strong>{allPools[0].matched.toLocaleString()} kg</strong><span>{Math.round(allPools[0].matched / allPools[0].required * 100)}% fulfilled</span></div></div><div className="pool-table"><div className="table-head"><span>Pool</span><span>Crop & requirement</span><span>Farmers</span><span>Status</span><span>Created</span></div>{allPools.map((pool) => <div className="table-row" key={pool.id}><strong>{pool.id}</strong><span><b>{pool.crop}</b><small>{pool.required.toLocaleString()} kg required</small></span><span className="people-stack"><i>AP</i><i>MS</i><i>SJ</i><i>+{Math.max(pool.farmers - 3, 1)}</i></span><span className="status-pill success"><i /> {pool.matched >= pool.required ? "Fulfilled" : "In progress"}</span><span className="muted-label">{pool.createdAt}</span></div>)}</div><div className="pool-flow-large"><div className="section-heading"><div><span className="eyebrow">Coordination view</span><h2>One pool. Four farms. One delivery.</h2></div></div><div className="large-flow"><div className="source-column"><span>Participating farmers</span>{["Arjun Patil · 150 kg", "Meera Shinde · 200 kg", "Suresh Jadhav · 300 kg", "Kavita More · 350 kg"].map((name) => <div key={name}><Sprout size={15} />{name}</div>)}</div><ArrowRight className="large-arrow" /><div className="pool-core"><Boxes size={27} /><strong>FarmFuse Pool</strong><span>1,000 kg consolidated</span></div><ArrowRight className="large-arrow" /><div className="buyer-core"><ShoppingCart size={22} /><strong>Narmada Foods</strong><span>Bulk buyer · Dhule</span></div></div></div></> }
-function Produce({ produce, onAdd, onDelete }: { produce: Farmer[]; onAdd: () => void; onDelete: (id: string) => void }) { return <><PageIntro eyebrow="Your supply ledger" title="My produce" text="Keep available quantities and asking prices current so buyers can match with confidence." action={<button className="primary-button" onClick={onAdd}><Plus size={16} /> Add produce</button>} /><div className="stat-grid three"><Stat label="Available supply" value="700 kg" detail="Across 3 crop types" icon={Package} /><Stat label="Active listings" value={String(produce.length).padStart(2, "0")} detail="Visible to buyers" tone="amber" icon={Leaf} /><Stat label="Average asking price" value="₹22.80" detail="Per kilogram" tone="blue" icon={CircleDollarSign} /></div><div className="produce-list"><div className="table-head"><span>Produce</span><span>Available</span><span>Asking price</span><span>Location</span><span>Action</span></div>{produce.map((item) => <div className="table-row" key={item.id}><span className="produce-name"><span style={{ background: item.color }}>{item.crop.slice(0, 1)}</span><b>{item.crop}</b></span><strong>{item.quantity} kg</strong><strong>₹{item.price}<small>/kg</small></strong><span className="muted-label">{item.location}</span><button className="delete-button" onClick={() => onDelete(item.id)} aria-label={`Remove ${item.crop}`}><X size={15} /></button></div>)}</div></> }
-function Prices() { return <><PageIntro eyebrow="Know your value" title="Price intelligence" text="A calm reference point for negotiating fair, direct trade." /><div className="notice"><ShieldCheck size={17} /><span>Illustrative demo data · not live market price</span></div><div className="price-grid"><div className="price-card accent"><span>Reference market price</span><strong>₹28–₹32<span>/kg</span></strong><small>Indicative regional range</small><div className="range-bar"><i /></div></div><div className="price-card"><span>Suggested buying range</span><strong>₹29–₹31<span>/kg</span></strong><small>Balanced for both sides</small><div className="mini-bars"><i /><i /><i /><i /><i /><i /><i /></div></div><div className="price-card"><span>Estimated buyer savings</span><strong>₹8,420</strong><small>On this 1,000 kg order</small><div className="savings-line"><ArrowRight size={15} /> 9.4% below spot</div></div></div><div className="chart-panel"><div className="panel-heading"><div><span className="eyebrow">Tomato · last 30 days</span><h2>Price movement</h2></div><span className="status-pill neutral">Demo trend</span></div><div className="chart"><div className="chart-y"><span>₹34</span><span>₹30</span><span>₹26</span><span>₹22</span></div><svg viewBox="0 0 700 220" preserveAspectRatio="none" role="img" aria-label="Illustrative tomato price trend"><path className="chart-fill" d="M0 160 C70 150 80 100 145 120 S220 150 275 92 S345 115 400 82 S480 40 530 68 S620 72 700 30 V220 H0 Z" /><path className="chart-line" d="M0 160 C70 150 80 100 145 120 S220 150 275 92 S345 115 400 82 S480 40 530 68 S620 72 700 30" /></svg></div></div></> }
-function Logistics({ matched, farmers: farmerCount }: { matched: number; farmers: number }) { return <><PageIntro eyebrow="From farms to one truck" title="Smart logistics" text="A coordinated movement plan that keeps the last mile visible to everyone." action={<span className="status-pill success"><i /> Simulation active</span>} /><div className="logistics-stats"><Stat label="Participating farmers" value={String(farmerCount || 4)} detail="Across 4 locations" icon={Users} /><Stat label="Consolidated quantity" value={`${matched || 1000} kg`} detail="Ready for collection" tone="amber" icon={Boxes} /><Stat label="Collection hub" value="Dhule Hub" detail="12 km from buyer" tone="blue" icon={Factory} /></div><div className="logistics-flow"><LogisticNode icon={<Sprout size={23} />} title="Multiple farmers" detail="4 pickup points" /><div className="route-line"><i /><span>Pickup route</span></div><LogisticNode icon={<Factory size={23} />} title="Collection hub" detail="Dhule Agro Hub" active /><div className="route-line"><i /><span>Consolidate</span></div><LogisticNode icon={<Truck size={23} />} title="Bulk shipment" detail="1 vehicle · 1,000 kg" /><div className="route-line"><i /><span>Direct delivery</span></div><LogisticNode icon={<ShoppingCart size={23} />} title="Buyer" detail="Narmada Foods" /></div><div className="notice muted-notice"><Route size={17} /><span>Logistics information is simulated for the demo. No real-time GPS data is being claimed.</span></div></> }
-function LogisticNode({ icon, title, detail, active }: { icon: React.ReactNode; title: string; detail: string; active?: boolean }) { return <div className={`logistic-node ${active ? "active" : ""}`}><div>{icon}</div><strong>{title}</strong><span>{detail}</span></div> }
-function Orders({ fulfillment }: { fulfillment: number }) { return <><PageIntro eyebrow="Follow every handoff" title="Order tracking" text="One shared timeline from buyer request to completed delivery." /><div className="order-heading"><div><span className="eyebrow">BO-1001</span><h2>🍅 Tomato bulk order</h2><p>Narmada Foods · 1,000 kg · Dhule, Maharashtra</p></div><span className="status-pill success"><i /> In progress</span></div><div className="timeline">{["Order created", "Farmers matched", "Farm pool created", "Produce collection", "Bulk consolidation", "Dispatch", "Buyer delivery", "Completed"].map((step, index) => <div className={`timeline-step ${index < 4 ? "done" : index === 4 ? "current" : ""}`} key={step}><div className="timeline-dot">{index < 4 ? <Check size={13} /> : index + 1}</div><strong>{step}</strong><span>{index < 4 ? "10 Sep 2026" : index === 4 ? "Next · 12 Sep" : "Pending"}</span></div>)}</div><div className="order-bottom"><div><span className="eyebrow">Current progress</span><strong>{fulfillment || 100}% <small>ready for consolidation</small></strong></div><div className="progress-track"><i style={{ width: `${fulfillment || 100}%` }} /></div></div></> }
-function Insights() { return <><PageIntro eyebrow="Signals for your next move" title="Market insights" text="Illustrative demand patterns to help plan what you grow and buy." /><div className="notice"><CloudSun size={17} /><span>Illustrative demo data · connect a verified market feed before production decisions</span></div><div className="insight-grid"><InsightCard crop="Tomato" color="#e77850" value="+18%" text="Demand rising" points="12,70 60,60 110,64 160,35 210,48 260,21 310,31" /><InsightCard crop="Potato" color="#c89d68" value="+9%" text="Stable demand" points="12,58 60,51 110,55 160,44 210,48 260,40 310,35" /><InsightCard crop="Onion" color="#77a7a1" value="-4%" text="Watch supply" points="12,25 60,40 110,35 160,51 210,47 260,64 310,59" /></div><div className="insight-table"><div className="panel-heading"><div><span className="eyebrow">Planning signals</span><h2>Crop pulse</h2></div></div>{[["Tomato", "High", "18–22 days", "₹29–₹31/kg"], ["Potato", "Steady", "30–45 days", "₹20–₹24/kg"], ["Onion", "Moderate", "15–25 days", "₹24–₹28/kg"]].map((row) => <div className="pulse-row" key={row[0]}><strong>{row[0]}</strong><span className="pulse-high">{row[1]}</span><span>{row[2]} harvest window</span><b>{row[3]}</b></div>)}</div></> }
-function InsightCard({ crop, color, value, text, points }: { crop: string; color: string; value: string; text: string; points: string }) { return <div className="insight-card"><div className="insight-title"><span style={{ background: color }}>{crop.slice(0, 1)}</span><strong>{crop}</strong><span className="insight-change">{value}</span></div><svg viewBox="0 0 320 90" preserveAspectRatio="none"><polyline points={points} fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" /></svg><small>{text} over the last 30 days</small></div> }
-function Profile({ role }: { role: Role }) { return <><PageIntro eyebrow="Your account" title="Profile & settings" text="Manage the details that make coordination smoother." /><div className="profile-grid"><div className="profile-card"><div className="profile-cover" /><div className="profile-main"><div className="profile-avatar">{role === "buyer" ? "NK" : "AP"}</div><h2>{role === "buyer" ? "Narmada Foods" : "Arjun Patil"}</h2><p>{role === "buyer" ? "Bulk buyer · Dhule, Maharashtra" : "Farmer · Nashik, Maharashtra"}</p><span className="status-pill success"><i /> Verified account</span></div></div><div className="settings-card"><div className="panel-heading"><h2>Notifications</h2><Bell size={18} /></div><div className="setting-row"><div><strong>Pool activity</strong><span>Updates when contributions are matched</span></div><div className="toggle on"><i /></div></div><div className="setting-row"><div><strong>Price insights</strong><span>Weekly crop and market summaries</span></div><div className="toggle on"><i /></div></div><div className="setting-row"><div><strong>Logistics updates</strong><span>Collection and dispatch milestones</span></div><div className="toggle"><i /></div></div></div></div></> }
+function Landing({
+  t,
+  language,
+  setLanguage,
+  onAuth,
+  onMarketplace,
+}: {
+  t: Copy;
+  language: Language;
+  setLanguage: (language: Language) => void;
+  onAuth: (mode: "login" | "register") => void;
+  onMarketplace: () => void;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  return (
+    <div className="landing">
+      <header className="navbar landing-nav">
+        <button className="brand">
+          <span className="brand-icon">
+            <Sprout size={18} />
+          </span>
+          <span>
+            farm<span>fuse</span>
+          </span>
+        </button>
+        <button
+          className="mobile-menu landing-menu"
+          aria-label="Open menu"
+          onClick={() => setMenuOpen(!menuOpen)}
+        >
+          <Menu />
+        </button>
+        {menuOpen && (
+          <div className="corner-menu">
+            <button onClick={onMarketplace}>Browse marketplace</button>
+            <button onClick={() => onAuth("login")}>Login</button>
+            <button onClick={() => onAuth("register")}>Register</button>
+          </div>
+        )}
+        <div className="nav-actions">
+          <label className="language">
+            <Globe2 size={15} />
+            <select
+              value={language}
+              onChange={(event) => setLanguage(event.target.value as Language)}
+            >
+              <option value="en">English</option>
+              <option value="hi">हिंदी</option>
+              <option value="mr">मराठी</option>
+            </select>
+          </label>
+          <button className="profile-button" onClick={() => onAuth("login")}>
+            <LogIn size={17} /> Login
+          </button>
+          <button
+            className="button primary register-button"
+            onClick={() => onAuth("register")}
+          >
+            <UserPlus size={16} /> Register
+          </button>
+        </div>
+      </header>
+      <section className="hero">
+        <div className="hero-copy">
+          <span className="kicker">
+            <Leaf size={15} /> Farmer-first marketplace
+          </span>
+          <h1>{t.hero}</h1>
+          <p>{t.heroText}</p>
+          <div className="hero-actions">
+            <button
+              className="button primary"
+              onClick={() => onAuth("register")}
+            >
+              <Sprout size={17} />
+              {t.sellNow}
+            </button>
+            <button className="button light" onClick={onMarketplace}>
+              <ShoppingBasket size={17} />
+              {t.buyNow}
+            </button>
+          </div>
+          <div className="hero-proof">
+            <span>
+              <strong>24k+</strong> kg connected supply
+            </span>
+            <span>
+              <strong>1,280</strong> farmer partners
+            </span>
+            <span>
+              <strong>32%</strong> route reduction*
+            </span>
+          </div>
+        </div>
+        <div className="hero-visual">
+          <div className="floating-note note-top">
+            <span>Incoming supply</span>
+            <strong>Fresh produce is arriving</strong>
+            <small>Tomato · 4,200 kg from Nashik</small>
+          </div>
+          <div className="floating-note note-bottom">
+            <span className="pulse" /> Smart matching active{" "}
+            <ArrowRight size={15} />
+          </div>
+        </div>
+      </section>
+      <section className="direct-strip">
+        <span className="eyebrow">{t.direct}</span>
+        <div className="flow">
+          <b>👨‍🌾 Farmers / FPOs</b>
+          <ArrowRight />
+          <b>FarmFuse marketplace</b>
+          <ArrowRight />
+          <b>🛒 Consumers & buyers</b>
+        </div>
+      </section>
+      <section className="home-section">
+        <div className="section-title">
+          <span className="eyebrow">The FarmFuse difference</span>
+          <h2>Less waiting. More value. A clearer path for every harvest.</h2>
+        </div>
+        <div className="feature-row">
+          <Feature
+            icon={<Zap />}
+            title="Demand forecasting"
+            text="See what buyers need next, before produce is picked."
+          />
+          <Feature
+            icon={<Users />}
+            title="Smart farmer matching"
+            text="Combine the right farms by quantity, price and distance."
+          />
+          <Feature
+            icon={<Truck />}
+            title="Smart logistics"
+            text="One collection route replaces a chain of unnecessary handoffs."
+          />
+        </div>
+      </section>
+      <section className="compare">
+        <div>
+          <span className="eyebrow">The old chain</span>
+          <p>
+            Farmer <ArrowRight /> Trader <ArrowRight /> Wholesaler{" "}
+            <ArrowRight /> Distributor <ArrowRight /> Retailer
+          </p>
+        </div>
+        <div className="compare-new">
+          <span className="eyebrow">The direct chain</span>
+          <p>
+            Farmers / FPOs <ArrowRight /> <strong>FarmFuse</strong>{" "}
+            <ArrowRight /> Buyers
+          </p>
+        </div>
+      </section>
+      <section className="home-section how">
+        <div className="section-title">
+          <span className="eyebrow">How it works</span>
+          <h2>From a field listing to a fulfilled farm pool.</h2>
+        </div>
+        <div className="steps">
+          {[
+            [
+              "01",
+              "List your harvest",
+              "Share crop, quantity, price and ready date.",
+            ],
+            [
+              "02",
+              "Match demand",
+              "Buyers find supply, or ask FarmFuse to match a pool.",
+            ],
+            [
+              "03",
+              "Collect and deliver",
+              "Farmers stay visible while logistics brings the order together.",
+            ],
+          ].map(([number, title, text]) => (
+            <div className="step" key={number}>
+              <span>{number}</span>
+              <h3>{title}</h3>
+              <p>{text}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+function Feature({
+  icon,
+  title,
+  text,
+}: {
+  icon: ReactNode;
+  title: string;
+  text: string;
+}) {
+  return (
+    <article className="feature">
+      <div className="feature-icon">{icon}</div>
+      <h3>{title}</h3>
+      <p>{text}</p>
+    </article>
+  );
+}
+function PageHeader({
+  eyebrow,
+  title,
+  detail,
+  action,
+}: {
+  eyebrow: string;
+  title: string;
+  detail?: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="page-header">
+      <div>
+        <span className="eyebrow">{eyebrow}</span>
+        <h1>{title}</h1>
+        {detail && <p>{detail}</p>}
+      </div>
+      {action}
+    </div>
+  );
+}
+function Marketplace({
+  t,
+  listings,
+  search,
+  setSearch,
+  cart,
+  onAddCart,
+  onCheckout,
+  onBulk,
+}: {
+  t: Copy;
+  listings: Listing[];
+  search: string;
+  setSearch: (value: string) => void;
+  cart: CartItem[];
+  onAddCart: (listing: Listing) => void;
+  onCheckout: () => void;
+  onBulk: (crop: string) => void;
+}) {
+  const cartTotal = cart.reduce(
+    (sum, item) => sum + item.quantity * item.listing.price,
+    0,
+  );
+  return (
+    <div className="content">
+      <PageHeader
+        eyebrow="Buyer marketplace"
+        title="Choose your harvest."
+        detail="Different farms, different vegetables, one simple basket."
+      />
+      <div className="market-toolbar">
+        <div className="search">
+          <Search size={18} />
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder={t.search}
+          />
+        </div>
+        <button className="filter-button">
+          All produce <ChevronDown size={15} />
+        </button>
+      </div>
+      {cart.length > 0 && (
+        <div className="cart-panel">
+          <div>
+            <span className="eyebrow">Your cart</span>
+            <strong>
+              {cart.reduce((sum, item) => sum + item.quantity, 0)} kg across{" "}
+              {cart.length} vegetables
+            </strong>
+          </div>
+          <div className="cart-items">
+            {cart.map((item) => (
+              <span key={item.listing.id}>
+                {cropIcons[item.listing.crop]} {item.listing.crop}{" "}
+                {item.quantity} kg
+              </span>
+            ))}
+          </div>
+          <strong>₹{cartTotal.toLocaleString()}</strong>
+          <button className="button primary" onClick={onCheckout}>
+            Buy from cart <ArrowRight size={15} />
+          </button>
+        </div>
+      )}
+      {listings.length === 0 ? (
+        <Empty text="No produce matches that search yet." />
+      ) : (
+        <div className="listing-grid">
+          {listings.map((listing) => (
+            <article className="listing-card" key={listing.id}>
+              <div
+                className={`produce-art produce-${listing.crop.toLowerCase().replace(" ", "-")}`}
+              >
+                <span>{cropIcons[listing.crop] || "🌱"}</span>
+                <small>Fresh listing</small>
+              </div>
+              <div className="listing-body">
+                <div className="listing-title">
+                  <div>
+                    <span className="eyebrow">{listing.ready}</span>
+                    <h3>{listing.crop}</h3>
+                  </div>
+                  <strong>
+                    ₹{listing.price}
+                    <small>/kg</small>
+                  </strong>
+                </div>
+                <div className="listing-meta">
+                  <span>
+                    <Package size={15} />
+                    {listing.quantity.toLocaleString()} kg available
+                  </span>
+                  <span>
+                    <MapPin size={15} />
+                    {listing.location}
+                  </span>
+                  <span>
+                    <Sprout size={15} />
+                    {listing.farmer}
+                  </span>
+                </div>
+                <div className="listing-actions">
+                  <button
+                    className="button light"
+                    onClick={() => onBulk(listing.crop)}
+                  >
+                    Bulk request
+                  </button>
+                  <button
+                    className="button primary"
+                    onClick={() => onAddCart(listing)}
+                  >
+                    Add to cart <Plus size={15} />
+                  </button>
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+function Sell({
+  t,
+  listings,
+  setListings,
+  setToast,
+  onOrders,
+}: {
+  t: Copy;
+  listings: Listing[];
+  setListings: (items: Listing[]) => void;
+  setToast: (value: string) => void;
+  onOrders: () => void;
+}) {
+  const [form, setForm] = useState({
+    crop: "Tomato",
+    quantity: "320",
+    price: "24",
+    location: "Nashik, Maharashtra",
+    ready: "Today",
+  });
+  const mine = listings.filter((item) => item.farmer === "Arjun Patil");
+  function publish(event: React.FormEvent) {
+    event.preventDefault();
+    const listing = {
+      ...form,
+      id: `listing-${Date.now()}`,
+      quantity: Number(form.quantity),
+      price: Number(form.price),
+      farmer: "Arjun Patil",
+      available: true,
+    };
+    setListings([...listings, listing]);
+    setToast(`${form.crop} is now visible to buyers.`);
+  }
+  return (
+    <div className="content">
+      <PageHeader
+        eyebrow="Farmer workspace"
+        title={t.stock}
+        detail="Your produce stays in your control. Pause or update a listing anytime."
+        action={
+          <span className="live-chip">
+            <span /> Marketplace live
+          </span>
+        }
+      />
+      <div className="dashboard-stats">
+        <Stat
+          icon={<Package />}
+          label="Current stock"
+          value={`${mine.reduce((sum, item) => sum + item.quantity, 0).toLocaleString()} kg`}
+        />
+        <Stat icon={<ClipboardList />} label="Open orders" value="08" />
+        <Stat icon={<Users />} label="Buyer requests" value="04" />
+        <Stat icon={<Truck />} label="Active deliveries" value="02" />
+      </div>
+      <div className="farmer-actions">
+        <button
+          className="button primary"
+          onClick={() =>
+            setToast("Your stock is being considered for nearby buyer pools.")
+          }
+        >
+          Find a Farm Pool <Users size={16} />
+        </button>
+        <button className="button light" onClick={onOrders}>
+          See my orders <ClipboardList size={16} />
+        </button>
+      </div>
+      <div className="workspace-columns">
+        <form className="panel form-panel" onSubmit={publish}>
+          <div className="panel-heading">
+            <div>
+              <span className="eyebrow">New listing</span>
+              <h2>{t.add}</h2>
+            </div>
+            <Plus size={20} />
+          </div>
+          <div className="form-grid">
+            <label>
+              Vegetable
+              <select
+                value={form.crop}
+                onChange={(event) =>
+                  setForm({ ...form, crop: event.target.value })
+                }
+              >
+                {crops.map((crop) => (
+                  <option key={crop}>{crop}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Quantity (kg)
+              <input
+                type="number"
+                min="1"
+                value={form.quantity}
+                onChange={(event) =>
+                  setForm({ ...form, quantity: event.target.value })
+                }
+              />
+            </label>
+            <label>
+              Price per kg (₹)
+              <input
+                type="number"
+                min="1"
+                value={form.price}
+                onChange={(event) =>
+                  setForm({ ...form, price: event.target.value })
+                }
+              />
+            </label>
+            <label>
+              Ready date
+              <input
+                value={form.ready}
+                onChange={(event) =>
+                  setForm({ ...form, ready: event.target.value })
+                }
+              />
+            </label>
+            <label className="full">
+              Farm / collection location
+              <input
+                value={form.location}
+                onChange={(event) =>
+                  setForm({ ...form, location: event.target.value })
+                }
+              />
+            </label>
+          </div>
+          <button className="button primary full-button" type="submit">
+            {t.publish} <ArrowRight size={16} />
+          </button>
+        </form>
+        <div className="panel">
+          <div className="panel-heading">
+            <div>
+              <span className="eyebrow">My stock</span>
+              <h2>Listings buyers can see</h2>
+            </div>
+          </div>
+          <div className="stock-list">
+            {mine.length === 0 ? (
+              <Empty text="Add your first crop listing." />
+            ) : (
+              mine.map((listing) => (
+                <div className="stock-row" key={listing.id}>
+                  <span className="stock-emoji">{cropIcons[listing.crop]}</span>
+                  <div>
+                    <strong>{listing.crop}</strong>
+                    <small>
+                      {listing.quantity} kg · ₹{listing.price}/kg
+                    </small>
+                  </div>
+                  <button title="Edit listing">
+                    <Pencil size={15} />
+                  </button>
+                  <button
+                    title="Pause listing"
+                    onClick={() =>
+                      setListings(
+                        listings.map((item) =>
+                          item.id === listing.id
+                            ? { ...item, available: false }
+                            : item,
+                        ),
+                      )
+                    }
+                  >
+                    <Pause size={15} />
+                  </button>
+                  <button
+                    title="Remove listing"
+                    onClick={() =>
+                      setListings(
+                        listings.filter((item) => item.id !== listing.id),
+                      )
+                    }
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+function Stat({
+  icon,
+  label,
+  value,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="stat">
+      <span>{icon}</span>
+      <div>
+        <small>{label}</small>
+        <strong>{value}</strong>
+      </div>
+    </div>
+  );
+}
+function Orders({
+  t,
+  role,
+  requirement,
+  setRequirement,
+  onMatch,
+  onPool,
+}: {
+  t: Copy;
+  role: Role;
+  requirement: RequirementItem[];
+  setRequirement: (items: RequirementItem[]) => void;
+  onMatch: () => void;
+  onPool: () => void;
+}) {
+  const matches = [
+    { name: "Arjun Patil", location: "Nashik", contribution: 250 },
+    { name: "Meera Shinde", location: "Dhule", contribution: 200 },
+    { name: "Suresh Jadhav", location: "Jalgaon", contribution: 300 },
+    { name: "Kavita More", location: "Nandurbar", contribution: 250 },
+  ];
+  if (role === "farmer")
+    return (
+      <div className="content">
+        <PageHeader
+          eyebrow="Farmer workspace"
+          title="Your orders and pool requests"
+          detail="See the buyer demand connected to your listings."
+        />
+        <div className="farmer-order-list">
+          <article className="panel">
+            <div className="panel-heading">
+              <div>
+                <span className="eyebrow">Buyer request</span>
+                <h2>Tomato pool · 1,000 kg</h2>
+              </div>
+              <span className="status-pill">Open for matching</span>
+            </div>
+            <p className="muted">
+              Collection point: Dhule market yard · Required by 18 Sep
+            </p>
+            <div className="fulfilled">
+              <span>Your possible contribution</span>
+              <strong>250 kg</strong>
+            </div>
+            <button className="button primary" onClick={() => onMatch()}>
+              Join this Farm Pool <Users size={16} />
+            </button>
+          </article>
+          <article className="panel">
+            <div className="panel-heading">
+              <div>
+                <span className="eyebrow">Your delivery</span>
+                <h2>FF-7K29M4</h2>
+              </div>
+              <span className="status-pill success">Ready for collection</span>
+            </div>
+            <p className="muted">
+              Your contribution: 250 kg Tomato · Collection hub: Dhule
+            </p>
+            <button className="button light" onClick={() => onMatch()}>
+              View collection details <ArrowRight size={16} />
+            </button>
+          </article>
+        </div>
+      </div>
+    );
+  return (
+    <div className="content">
+      <PageHeader
+        eyebrow="Buyer workspace"
+        title={t.buying}
+        detail="Bring several crops together in one transparent requirement."
+        action={
+          <button
+            className="button primary"
+            onClick={() =>
+              setRequirement([...requirement, { crop: "Carrot", quantity: 50 }])
+            }
+          >
+            <Plus size={16} /> Add vegetable
+          </button>
+        }
+      />
+      <div className="workspace-columns">
+        <div className="panel">
+          <div className="panel-heading">
+            <div>
+              <span className="eyebrow">One requirement, many farms</span>
+              <h2>What do you need?</h2>
+            </div>
+            <ShoppingBasket size={20} />
+          </div>
+          <div className="requirement-list">
+            {requirement.map((item, index) => (
+              <div className="requirement-row" key={`${item.crop}-${index}`}>
+                <span>{cropIcons[item.crop]}</span>
+                <select
+                  value={item.crop}
+                  onChange={(event) =>
+                    setRequirement(
+                      requirement.map((current, i) =>
+                        i === index
+                          ? { ...current, crop: event.target.value }
+                          : current,
+                      ),
+                    )
+                  }
+                >
+                  {crops.map((crop) => (
+                    <option key={crop}>{crop}</option>
+                  ))}
+                </select>
+                <input
+                  type="number"
+                  min="1"
+                  value={item.quantity}
+                  onChange={(event) =>
+                    setRequirement(
+                      requirement.map((current, i) =>
+                        i === index
+                          ? { ...current, quantity: Number(event.target.value) }
+                          : current,
+                      ),
+                    )
+                  }
+                />
+                <b>kg</b>
+                <button
+                  onClick={() =>
+                    setRequirement(requirement.filter((_, i) => i !== index))
+                  }
+                >
+                  <Trash2 size={15} />
+                </button>
+              </div>
+            ))}
+          </div>
+          <div className="requirement-total">
+            <span>Total requirement</span>
+            <strong>
+              {requirement
+                .reduce((sum, item) => sum + item.quantity, 0)
+                .toLocaleString()}{" "}
+              kg
+            </strong>
+          </div>
+          <div className="button-row">
+            <button className="button primary" onClick={onMatch}>
+              {t.match} <ArrowRight size={16} />
+            </button>
+            <button
+              className="button light"
+              onClick={() =>
+                setRequirement([
+                  ...requirement,
+                  { crop: "Carrot", quantity: 50 },
+                ])
+              }
+            >
+              <Plus size={16} /> Add vegetable
+            </button>
+          </div>
+        </div>
+        <div className="panel match-panel">
+          <div className="panel-heading">
+            <div>
+              <span className="eyebrow">Smart matching</span>
+              <h2>Suitable farmers found</h2>
+            </div>
+            <span className="match-score">96%</span>
+          </div>
+          <p className="muted">
+            AI-assisted matching weighs available quantity, price, freshness and
+            collection distance. It supports decisions; it does not replace the
+            farmers.
+          </p>
+          <div className="match-bars">
+            {matches.map((match) => (
+              <div className="match-row" key={match.name}>
+                <span>
+                  <strong>{match.name}</strong>
+                  <small>
+                    {match.location} · {match.contribution} kg
+                  </small>
+                </span>
+                <div>
+                  <i
+                    style={{ width: `${(match.contribution / 300) * 100}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="fulfilled">
+            <span>1,000 / 1,000 kg matched</span>
+            <strong>100% fulfilled</strong>
+          </div>
+          <button className="button primary full-button" onClick={onPool}>
+            {t.pool} <ArrowRight size={16} />
+          </button>
+        </div>
+      </div>
+      <div className="pool-story">
+        <span className="eyebrow">Farm Pool FF-7K29M4</span>
+        <div>
+          <b>Multiple farmers</b>
+          <ArrowRight />
+          <b>Collection hub</b>
+          <ArrowRight />
+          <b>Consolidation</b>
+          <ArrowRight />
+          <b>Buyer</b>
+        </div>
+        <p>
+          FarmFuse coordinates the order without buying or reselling produce.
+          Each farmer contribution remains visible.
+        </p>
+      </div>
+    </div>
+  );
+}
+function Tracking({
+  order,
+  onAdvance,
+}: {
+  order?: FarmOrder;
+  onAdvance: () => void;
+}) {
+  const steps = [
+    "Order placed",
+    "Farmers matched",
+    "Produce being collected",
+    "Collection point",
+    "Consolidating",
+    "On the way",
+    "Delivered",
+  ];
+  return (
+    <div className="content">
+      <PageHeader
+        eyebrow="Transparent delivery"
+        title="Every order has a clear next step."
+        detail="Prototype route view: locations are illustrative, not live GPS."
+        action={
+          order && (
+            <button className="button primary" onClick={onAdvance}>
+              Advance status <ArrowRight size={16} />
+            </button>
+          )
+        }
+      />
+      {order ? (
+        <>
+          <div className="tracking-top panel">
+            <div>
+              <span className="eyebrow">FarmFuse Tracking ID</span>
+              <h2>{order.trackingId}</h2>
+              <button
+                className="copy-link"
+                onClick={() => navigator.clipboard?.writeText(order.trackingId)}
+              >
+                Copy tracking ID
+              </button>
+            </div>
+            <div className="tracking-facts">
+              <b>{order.farmers.length || 4} farmers</b>
+              <span>{order.total.toLocaleString()} kg</span>
+              <span>100% fulfilled</span>
+            </div>
+          </div>
+          <div className="tracking-layout">
+            <div className="panel">
+              <div className="timeline">
+                {steps.map((step, index) => (
+                  <div
+                    className={
+                      index <= order.status
+                        ? "timeline-step done"
+                        : "timeline-step"
+                    }
+                    key={step}
+                  >
+                    <span>
+                      {index <= order.status ? <Check size={14} /> : index + 1}
+                    </span>
+                    <div>
+                      <strong>{step}</strong>
+                      <small>
+                        {index <= order.status
+                          ? "Complete"
+                          : index === order.status + 1
+                            ? "Next in route"
+                            : "Waiting"}
+                      </small>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <RouteMap order={order} />
+          </div>
+          <div className="panel order-items">
+            <span className="eyebrow">Order contents</span>
+            <h2>From the farm pool</h2>
+            {order.items.map((item) => (
+              <div className="item-line" key={item.crop}>
+                <span>
+                  {cropIcons[item.crop]} {item.crop}
+                </span>
+                <strong>{item.quantity} kg</strong>
+              </div>
+            ))}
+          </div>
+        </>
+      ) : (
+        <Empty text="Place an order from the marketplace to see its tracking journey here." />
+      )}
+    </div>
+  );
+}
+function RouteMap({ order }: { order: FarmOrder }) {
+  const locations: Record<string, string> = {
+    "Arjun Patil": "Nashik",
+    "Meera Shinde": "Dhule",
+    "Suresh Jadhav": "Jalgaon",
+    "Kavita More": "Nandurbar",
+    "Rohan Deshmukh": "Pune",
+    "Priya Raut": "Aurangabad",
+  };
+  const farmers = order.farmers.length ? order.farmers : ["Nearby farm"];
+  const baseQuantity = Math.floor(order.total / farmers.length);
+  const routeStart = 104 + farmers.length * 11;
+  const routeEnd = 68 + farmers.length * 7;
+  return (
+    <div className="panel">
+      <div className="panel-heading">
+        <div>
+          <span className="eyebrow">Collection route</span>
+          <h2>{farmers.length} farms · {order.total.toLocaleString()} kg</h2>
+        </div>
+        <MapPin size={20} />
+      </div>
+      <div className="route-map">
+        <div className="route-path path-one" />
+        <div className="route-path path-two" />
+        <div className="route-path path-three" />
+        {farmers.map((farmer, index) => (
+          <div className={`map-pin farm-pin-${index % 4}`} key={farmer}>
+            {index % 2 === 0 ? "👨‍🌾" : "👩‍🌾"}
+            <small>{farmer} · {index === farmers.length - 1 ? order.total - baseQuantity * (farmers.length - 1) : baseQuantity} kg · {locations[farmer] || "Nearby"}</small>
+          </div>
+        ))}
+        <div className="map-pin hub-pin">
+          📍<small>Collection hub</small>
+        </div>
+        <div className="map-pin buyer-pin">
+          🛒<small>Buyer</small>
+        </div>
+      </div>
+      <div className="route-callout">
+        <strong>Suggested collection route</strong>
+        <span>
+          {routeStart} km <ArrowRight size={14} /> <b>{routeEnd} km</b>
+        </span>
+        <small>Illustrative route calculation for this order · {Math.round(((routeStart - routeEnd) / routeStart) * 100)}% potential reduction</small>
+      </div>
+    </div>
+  );
+}
+function Intelligence() {
+  return (
+    <div className="content">
+      <PageHeader
+        eyebrow="FarmFuse Intelligence"
+        title="The intelligence stays behind the experience."
+        detail="Simple signals help farmers plan and help buyers source with confidence."
+      />
+      <div className="intelligence-grid">
+        <article className="intel-card">
+          <div className="intel-icon">
+            <Zap />
+          </div>
+          <span className="eyebrow">01 / Demand forecasting</span>
+          <h2>Tomato demand is rising next week.</h2>
+          <div className="chart">
+            <i style={{ height: "35%" }} />
+            <i style={{ height: "52%" }} />
+            <i style={{ height: "48%" }} />
+            <i style={{ height: "76%" }} />
+            <i style={{ height: "91%" }} />
+            <i style={{ height: "84%" }} />
+          </div>
+          <p>
+            Current connected supply covers 82% of projected demand. Farmers can
+            plan the next harvest with a clearer signal.
+          </p>
+        </article>
+        <article className="intel-card">
+          <div className="intel-icon peach">
+            <Users />
+          </div>
+          <span className="eyebrow">02 / Smart farmer matching</span>
+          <h2>Four farms can fulfil one larger order.</h2>
+          <div className="big-number">
+            1,000 <small>kg</small>
+          </div>
+          <div className="mini-progress">
+            <i />
+          </div>
+          <p>
+            Matches balance quantity, price, freshness and collection distance.
+            The final choice stays transparent.
+          </p>
+        </article>
+        <article className="intel-card">
+          <div className="intel-icon blue">
+            <Truck />
+          </div>
+          <span className="eyebrow">03 / Route optimization</span>
+          <h2>Consolidate collection before the last mile.</h2>
+          <div className="route-number">
+            <strong>142</strong>
+            <ArrowRight />
+            <strong>96</strong>
+            <small>km illustrative route</small>
+          </div>
+          <p>
+            Multiple farm pickups become one coordinated movement to a
+            collection hub and then the buyer.
+          </p>
+        </article>
+      </div>
+      <div className="note-band">
+        <Sprout size={20} />
+        <p>
+          <strong>FarmFuse is a marketplace, not a middleman.</strong> Farmers
+          and buyers connect directly. FarmFuse helps them discover, match and
+          move produce with less waste.
+        </p>
+      </div>
+    </div>
+  );
+}
+function Empty({ text }: { text: string }) {
+  return (
+    <div className="empty">
+      <Leaf size={24} />
+      <p>{text}</p>
+    </div>
+  );
+}
+function Home({
+  t,
+  role,
+  onNavigate,
+}: {
+  t: Copy;
+  role: Role;
+  onNavigate: (view: View) => void;
+}) {
+  return (
+    <div className="content">
+      <PageHeader
+        eyebrow="Your FarmFuse workspace"
+        title={t.home}
+        detail="Choose a path and keep the chain moving."
+      />
+      <div className="home-portal">
+        {role === "farmer" ? (
+          <>
+            <button onClick={() => onNavigate("sell")}>
+              <Sprout />
+              <span>
+                <strong>{t.sellNow}</strong>
+                <small>List stock, publish produce and respond to buyer pools.</small>
+              </span>
+              <ArrowRight />
+            </button>
+            <button onClick={() => onNavigate("intelligence")}>
+              <Zap />
+              <span>
+                <strong>Plan your next harvest</strong>
+                <small>Use demand, matching and route insights before you list.</small>
+              </span>
+              <ArrowRight />
+            </button>
+          </>
+        ) : (
+          <>
+            <button onClick={() => onNavigate("market")}>
+              <ShoppingBasket />
+              <span>
+                <strong>{t.buyNow}</strong>
+                <small>Browse incoming produce and add vegetables to your cart.</small>
+              </span>
+              <ArrowRight />
+            </button>
+            <button onClick={() => onNavigate("orders")}>
+              <Truck />
+              <span>
+                <strong>Incoming supply and deliveries</strong>
+                <small>Review requirements, farm pools and your order journey.</small>
+              </span>
+              <ArrowRight />
+            </button>
+          </>
+        )}
+      </div>
+      <div className="home-banner">
+        <span className="eyebrow">One clear platform</span>
+        <h2>Direct connection, pooled supply, thoughtful logistics.</h2>
+        <button
+          className="button light"
+          onClick={() => onNavigate(role === "farmer" ? "intelligence" : "market")}
+        >
+          See the intelligence <ArrowRight size={16} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function AuthModal({
+  mode: initialMode,
+  onClose,
+  onSuccess,
+}: {
+  mode: "login" | "register";
+  onClose: () => void;
+  onSuccess: (role: Role, name: string) => void;
+}) {
+  const [mode, setMode] = useState(initialMode);
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    password: "",
+    role: "BUYER",
+    location: "",
+  });
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setError("");
+    setBusy(true);
+    try {
+      const response = await fetch(
+        mode === "login" ? "/api/auth/login" : "/api/auth/register",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(form),
+        },
+      );
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Unable to continue.");
+      onSuccess(
+        data.user.role === "farmer" ? "farmer" : "buyer",
+        data.user.name,
+      );
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to continue.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="auth-overlay" onClick={onClose}>
+      <form
+        className="auth-modal"
+        onClick={(event) => event.stopPropagation()}
+        onSubmit={submit}
+      >
+        <button type="button" className="modal-close" onClick={onClose}>
+          <X size={18} />
+        </button>
+        <div className="auth-heading">
+          <span className="brand-icon">
+            <Sprout size={18} />
+          </span>
+          <div>
+            <span className="eyebrow">FarmFuse account</span>
+            <h2>{mode === "login" ? "Welcome back" : "Create your account"}</h2>
+          </div>
+        </div>
+        <div className="auth-tabs">
+          <button
+            type="button"
+            className={mode === "login" ? "active" : ""}
+            onClick={() => setMode("login")}
+          >
+            <LogIn size={15} /> Login
+          </button>
+          <button
+            type="button"
+            className={mode === "register" ? "active" : ""}
+            onClick={() => setMode("register")}
+          >
+            <UserPlus size={15} /> Register
+          </button>
+        </div>
+        {mode === "register" && (
+          <label className="auth-field">
+            Full name
+            <input
+              required
+              value={form.name}
+              onChange={(event) =>
+                setForm({ ...form, name: event.target.value })
+              }
+              placeholder="Your name or FPO"
+            />
+          </label>
+        )}
+        <label className="auth-field">
+          Email
+          <input
+            required
+            type="email"
+            value={form.email}
+            onChange={(event) =>
+              setForm({ ...form, email: event.target.value })
+            }
+            placeholder="you@example.com"
+          />
+        </label>
+        <label className="auth-field">
+          Password
+          <input
+            required
+            type="password"
+            minLength={8}
+            value={form.password}
+            onChange={(event) =>
+              setForm({ ...form, password: event.target.value })
+            }
+            placeholder="At least 8 characters"
+          />
+        </label>
+        {mode === "register" && (
+          <>
+            <label className="auth-field">
+              I am joining as
+              <select
+                value={form.role}
+                onChange={(event) =>
+                  setForm({ ...form, role: event.target.value })
+                }
+              >
+                <option value="BUYER">Buyer / consumer</option>
+                <option value="FARMER">Farmer / FPO</option>
+              </select>
+            </label>
+            <label className="auth-field">
+              Location
+              <input
+                required
+                value={form.location}
+                onChange={(event) =>
+                  setForm({ ...form, location: event.target.value })
+                }
+                placeholder="Nashik, Maharashtra"
+              />
+            </label>
+          </>
+        )}
+        {error && <p className="auth-error">{error}</p>}
+        <button className="button primary auth-submit" disabled={busy}>
+          {busy
+            ? "Please wait..."
+            : mode === "login"
+              ? "Login"
+              : "Create account"}{" "}
+          <ArrowRight size={16} />
+        </button>
+      </form>
+    </div>
+  );
+}

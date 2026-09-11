@@ -18,10 +18,12 @@ export const demoProduce: DemoProduce[] = [
 
 export function matchProduce(requiredQuantity: number, supply = demoProduce) {
   let remaining = Math.max(requiredQuantity, 0);
-  return supply.flatMap((farmer) => {
+  return [...supply]
+    .sort((left, right) => left.price - right.price || left.location.localeCompare(right.location) || left.id.localeCompare(right.id))
+    .flatMap((farmer) => {
     if (remaining <= 0) return [];
     const contribution = Math.min(remaining, farmer.quantity);
     remaining -= contribution;
     return [{ ...farmer, contribution }];
-  });
+    });
 }

@@ -19,6 +19,7 @@ model User {
   produce       Produce[]
   bulkOrders    BulkOrder[]
   orders        Order[]
+  farmerOrders  Order[]        @relation("FarmerOrders")
   pools         FarmPool[]
   notifications Notification[]
 }
@@ -46,10 +47,12 @@ model Produce {
   quantityKg  Float
   pricePerKg  Float
   location    String
+  readyDate   DateTime?
   available   Boolean  @default(true)
   createdAt   DateTime @default(now())
   farmer      User     @relation(fields: [farmerId], references: [id], onDelete: Cascade)
   poolMembers  FarmPoolMember[]
+  orderItems   OrderItem[]
 }
 
 model BulkOrder {
@@ -64,6 +67,15 @@ model BulkOrder {
   createdAt          DateTime  @default(now())
   buyer              User      @relation(fields: [buyerId], references: [id], onDelete: Cascade)
   pool               FarmPool?
+  items              BulkOrderItem[]
+}
+
+model BulkOrderItem {
+  id                 String    @id @default(cuid())
+  bulkOrderId        String
+  crop               String
+  requiredQuantityKg Float
+  bulkOrder          BulkOrder @relation(fields: [bulkOrderId], references: [id], onDelete: Cascade)
 }
 
 model FarmPool {
@@ -92,24 +104,31 @@ model FarmPoolMember {
 }
 
 model Order {
-  id          String      @id @default(cuid())
-  orderCode   String      @unique
-  buyerId     String
-  farmPoolId  String      @unique
-  status      OrderStatus @default(CREATED)
-  createdAt   DateTime    @default(now())
-  buyer       User        @relation(fields: [buyerId], references: [id])
-  farmPool    FarmPool    @relation(fields: [farmPoolId], references: [id])
-  items       OrderItem[]
+  id                String      @id @default(cuid())
+  orderCode         String      @unique
+  buyerId           String
+  farmerId          String?
+  farmPoolId        String?     @unique
+  status            OrderStatus @default(PENDING)
+  totalAmount       Float       @default(0)
+  inventoryRestored Boolean     @default(false)
+  createdAt         DateTime    @default(now())
+  buyer             User        @relation(fields: [buyerId], references: [id])
+  farmer            User?       @relation("FarmerOrders", fields: [farmerId], references: [id])
+  farmPool          FarmPool?   @relation(fields: [farmPoolId], references: [id])
+  items             OrderItem[]
 }
 
 model OrderItem {
-  id          String @id @default(cuid())
+  id          String   @id @default(cuid())
   orderId     String
+  produceId   String?
   crop        String
   quantityKg  Float
+  unit        String   @default("kg")
   pricePerKg  Float
-  order       Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  produce     Produce? @relation(fields: [produceId], references: [id])
 }
 
 model Notification {
@@ -136,13 +155,20 @@ enum PoolStatus {
 }
 
 enum OrderStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  PREPARING
+  READY
+  COMPLETED
+  ORDER_PLACED
   OPEN
   CREATED
   MATCHED
   POOL_CREATED
   COLLECTION
+  COLLECTION_POINT
   CONSOLIDATION
   DISPATCHED
   DELIVERED
-  COMPLETED
 }

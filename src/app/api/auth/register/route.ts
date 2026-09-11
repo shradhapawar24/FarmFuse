@@ -14,7 +14,9 @@ export async function POST(request: Request) {
     if (!email || !name || password.length < 8 || !location || !["BUYER", "FARMER"].includes(role)) return NextResponse.json({ error: "Enter a name, valid location, email, and password of at least 8 characters." }, { status: 400 });
     const passwordHash = await hash(password, 10);
     const user = await prisma.user.create({ data: role === "FARMER" ? { email, name, passwordHash, role: "FARMER", farmerProfile: { create: { location } } } : { email, name, passwordHash, role: "BUYER", buyerProfile: { create: { companyName: name, location } } } });
-    return NextResponse.json({ user: { email: user.email, name: user.name, role: role.toLowerCase() } }, { status: 201 });
+    const response = NextResponse.json({ user: { email: user.email, name: user.name, role: role.toLowerCase() } }, { status: 201 });
+    response.cookies.set("farmfuse_session", JSON.stringify({ email: user.email, name: user.name, role: role.toLowerCase() }), { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", maxAge: 60 * 60 * 8, path: "/" });
+    return response;
   } catch {
     return NextResponse.json({ error: "Could not create the account. The email may already be registered." }, { status: 409 });
   }

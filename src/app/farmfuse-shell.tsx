@@ -29,7 +29,7 @@ import {
 
 type Role = "farmer" | "buyer";
 type Language = "en" | "hi" | "mr";
-type View = "home" | "market" | "sell" | "orders" | "track" | "intelligence";
+type View = "home" | "market" | "product" | "cart" | "checkout" | "sell" | "orders" | "track" | "intelligence";
 type Listing = {
   id: string;
   crop: string;
@@ -49,8 +49,21 @@ type FarmOrder = {
   total: number;
   status: number;
   date: string;
+  contributions?: Array<{ farmer: string; crop: string; quantity: number; price: number; location: string }>;
+  buyer?: string;
+  totalAmount?: number;
 };
 type CartItem = { listing: Listing; quantity: number };
+type MatchEntry = { id: string; name: string; crop: string; location: string; quantity: number; price: number; ready?: string; contribution: number };
+type MatchItem = { crop: string; required: number; matched: number; remaining: number; fulfillment: number; selected: MatchEntry[] };
+
+function statusIndex(status: string) {
+  return ["PENDING", "ACCEPTED", "PREPARING", "READY", "COMPLETED", "REJECTED", "ORDER_PLACED", "MATCHED", "COLLECTION", "COLLECTION_POINT", "CONSOLIDATION", "DISPATCHED", "DELIVERED"].indexOf(status);
+}
+
+function statusLabel(status: string) {
+  return ({ PENDING: "Pending", ACCEPTED: "Accepted", PREPARING: "Preparing", READY: "Ready", COMPLETED: "Completed", REJECTED: "Rejected", ORDER_PLACED: "Order placed", MATCHED: "Farmers matched", COLLECTION: "Produce being collected", COLLECTION_POINT: "Collection point", CONSOLIDATION: "Consolidating", DISPATCHED: "On the way", DELIVERED: "Delivered" } as Record<string, string>)[status] || status;
+}
 
 const crops = [
   "Tomato",
@@ -94,68 +107,6 @@ const cropIcons: Record<string, string> = {
   Beetroot: "🫒",
   Radish: "🥕",
 };
-const seedListings: Listing[] = [
-  {
-    id: "seed-1",
-    crop: "Tomato",
-    quantity: 4200,
-    price: 24,
-    location: "Nashik, Maharashtra",
-    farmer: "Arjun Patil",
-    ready: "Today",
-    available: true,
-  },
-  {
-    id: "seed-2",
-    crop: "Potato",
-    quantity: 5100,
-    price: 22,
-    location: "Dhule, Maharashtra",
-    farmer: "Meera Shinde",
-    ready: "18 Sep",
-    available: true,
-  },
-  {
-    id: "seed-3",
-    crop: "Onion",
-    quantity: 3900,
-    price: 26,
-    location: "Jalgaon, Maharashtra",
-    farmer: "Suresh Jadhav",
-    ready: "19 Sep",
-    available: true,
-  },
-  {
-    id: "seed-4",
-    crop: "Carrot",
-    quantity: 2400,
-    price: 30,
-    location: "Nandurbar, Maharashtra",
-    farmer: "Kavita More",
-    ready: "Tomorrow",
-    available: true,
-  },
-  {
-    id: "seed-5",
-    crop: "Cabbage",
-    quantity: 1800,
-    price: 20,
-    location: "Pune, Maharashtra",
-    farmer: "Rohan Deshmukh",
-    ready: "20 Sep",
-    available: true,
-  },
-  {
-    id: "seed-6",
-    crop: "Cauliflower",
-    quantity: 2600,
-    price: 29,
-    location: "Aurangabad, Maharashtra",
-    farmer: "Priya Raut",
-    ready: "21 Sep",
-    available: true,
-  },
-];
 const copy = {
   en: {
     home: "Home",
@@ -177,6 +128,16 @@ const copy = {
     pool: "Create Farm Pool",
     search: "Search vegetables, farms or locations",
     direct: "A shorter route from field to table",
+    productDetails: "Product details",
+    addToCart: "Add to cart",
+    viewDetails: "View details",
+    cart: "Cart",
+    checkout: "Checkout",
+    placeOrder: "Place order",
+    total: "Total",
+    quantity: "Quantity",
+    emptyCart: "Cart is empty.",
+    myOrders: "My orders",
   },
   hi: {
     home: "होम",
@@ -198,6 +159,16 @@ const copy = {
     pool: "Farm Pool बनाएं",
     search: "सब्ज़ी, खेत या जगह खोजें",
     direct: "खेत से थाली तक छोटा रास्ता",
+    productDetails: "उत्पाद विवरण",
+    addToCart: "कार्ट में जोड़ें",
+    viewDetails: "विवरण देखें",
+    cart: "कार्ट",
+    checkout: "चेकआउट",
+    placeOrder: "ऑर्डर दें",
+    total: "कुल",
+    quantity: "मात्रा",
+    emptyCart: "कार्ट खाली है।",
+    myOrders: "मेरे ऑर्डर",
   },
   mr: {
     home: "मुख्यपृष्ठ",
@@ -219,55 +190,70 @@ const copy = {
     pool: "Farm Pool तयार करा",
     search: "भाजी, शेत किंवा ठिकाण शोधा",
     direct: "शेतापासून ताटापर्यंत छोटा मार्ग",
+    productDetails: "उत्पादन तपशील",
+    addToCart: "कार्टमध्ये जोडा",
+    viewDetails: "तपशील पहा",
+    cart: "कार्ट",
+    checkout: "चेकआउट",
+    placeOrder: "ऑर्डर द्या",
+    total: "एकूण",
+    quantity: "प्रमाण",
+    emptyCart: "कार्ट रिकामी आहे.",
+    myOrders: "माझे ऑर्डर",
   },
 };
 
 type Copy = typeof copy.en;
 export default function FarmFuseShell() {
-  const [language, setLanguage] = useState<Language>("en");
+  const [language, setLanguage] = useState<Language>(() => {
+    if (typeof window === "undefined") return "en";
+    return (localStorage.getItem("farmfuse-language") as Language) || "en";
+  });
   const [role, setRole] = useState<Role | null>(null);
   const [userName, setUserName] = useState("");
   const [view, setView] = useState<View>("home");
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
-  const [listings, setListings] = useState<Listing[]>(() => {
-    try {
-      return typeof window === "undefined"
-        ? seedListings
-        : JSON.parse(
-            localStorage.getItem("farmfuse-listings") ||
-              JSON.stringify(seedListings),
-          );
-    } catch {
-      return seedListings;
-    }
-  });
-  const [orders, setOrders] = useState<FarmOrder[]>(() => {
-    try {
-      return typeof window === "undefined"
-        ? []
-        : JSON.parse(localStorage.getItem("farmfuse-orders") || "[]");
-    } catch {
-      return [];
-    }
-  });
+  const [listings, setListings] = useState<Listing[]>([]);
+  const [orders, setOrders] = useState<FarmOrder[]>([]);
   const [requirement, setRequirement] = useState<RequirementItem[]>([
     { crop: "Tomato", quantity: 100 },
     { crop: "Potato", quantity: 200 },
     { crop: "Onion", quantity: 150 },
   ]);
-  const [cart, setCart] = useState<CartItem[]>([]);
+  const [cart, setCart] = useState<CartItem[]>(() => {
+    if (typeof window === "undefined") return [];
+    try { return JSON.parse(localStorage.getItem("farmfuse-cart") || "[]") as CartItem[]; } catch { return []; }
+  });
   const [toast, setToast] = useState("");
   const [mobileOpen, setMobileOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [selectedTracking, setSelectedTracking] = useState("");
+  const [selectedListing, setSelectedListing] = useState<Listing | undefined>();
+  const [matches, setMatches] = useState<MatchItem[]>([]);
+  const [busy, setBusy] = useState(false);
   const t = copy[language];
   useEffect(() => {
-    localStorage.setItem("farmfuse-listings", JSON.stringify(listings));
-  }, [listings]);
+    localStorage.setItem("farmfuse-language", language);
+  }, [language]);
   useEffect(() => {
-    localStorage.setItem("farmfuse-orders", JSON.stringify(orders));
-  }, [orders]);
+    localStorage.setItem("farmfuse-cart", JSON.stringify(cart));
+  }, [cart]);
+  useEffect(() => {
+    if (!role) return;
+    void Promise.all([
+      fetch("/api/produce").then((response) => response.ok ? response.json() : { produce: [] }),
+      fetch("/api/orders").then((response) => response.ok ? response.json() : { orders: [] }),
+    ]).then(([produceData, orderData]) => {
+      setListings((produceData.produce || []).map((item: { id: string; crop: string; quantityKg: number; pricePerKg: number; location: string; farmer: { name: string }; readyDate?: string; createdAt: string }) => ({ id: item.id, crop: item.crop, quantity: item.quantityKg, price: item.pricePerKg, location: item.location, farmer: item.farmer.name, ready: item.readyDate ? new Date(item.readyDate).toLocaleDateString() : new Date(item.createdAt).toLocaleDateString(), available: true })));
+      setOrders((orderData.orders || []).map((item: { id: string; orderCode: string; status: string; createdAt: string; totalAmount?: number; buyer?: { name: string }; items: Array<{ crop: string; quantityKg: number; pricePerKg: number; produce?: { location: string; farmer: { name: string } } | null }>; farmPool?: { members: Array<{ contributionKg: number; produce: { crop: string; location: string; pricePerKg: number; farmer: { name: string } } }> } | null }) => {
+        const poolMembers = item.farmPool?.members || [];
+        const directContributions = item.items.filter((entry) => entry.produce).map((entry) => ({ farmer: entry.produce!.farmer.name, crop: entry.crop, quantity: entry.quantityKg, price: entry.pricePerKg, location: entry.produce!.location }));
+        const contributions = poolMembers.length ? poolMembers.map((member) => ({ farmer: member.produce.farmer.name, crop: member.produce.crop, quantity: member.contributionKg, price: member.produce.pricePerKg, location: member.produce.location })) : directContributions;
+        return { id: item.id, trackingId: item.orderCode, items: item.items.map((entry) => ({ crop: entry.crop, quantity: entry.quantityKg })), farmers: [...new Set(contributions.map((entry) => entry.farmer))], total: item.items.reduce((sum, entry) => sum + entry.quantityKg, 0), totalAmount: item.totalAmount ?? item.items.reduce((sum, entry) => sum + entry.quantityKg * entry.pricePerKg, 0), status: statusIndex(item.status), date: item.createdAt, buyer: item.buyer?.name, contributions };
+      }));
+    }).catch(() => setToast("Could not load database data."));
+  }, [role]);
   useEffect(() => {
     if (!toast) return;
     const timer = window.setTimeout(() => setToast(""), 2600);
@@ -293,27 +279,75 @@ export default function FarmFuseShell() {
   }
   function goBack() {
     if (view === "track") navigate("orders");
+    else if (view === "product") navigate("market");
+    else if (view === "cart") navigate("market");
+    else if (view === "checkout") navigate("cart");
+    else if (view === "orders") navigate(role === "buyer" ? "market" : "sell");
     else navigate("home");
   }
-  function addOrder(items = requirement) {
-    const total = items.reduce((sum, item) => sum + item.quantity, 0);
-    const farmers = visibleListings
-      .filter((listing) => items.some((item) => item.crop === listing.crop))
-      .slice(0, 4)
-      .map((item) => item.farmer);
-    const order = {
-      id: `order-${Date.now()}`,
-      trackingId: `FF-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
-      items,
-      farmers,
-      total,
-      status: 2,
-      date: new Date().toISOString(),
-    };
-    setOrders((current) => [order, ...current]);
-    setSelectedTracking(order.trackingId);
-    setToast(`Order placed. Tracking ID ${order.trackingId}`);
-    navigate("track");
+  async function addOrder(items = requirement, currentMatches = matches) {
+    if (!items.length || !currentMatches.length || currentMatches.length !== items.length || currentMatches.some((item) => item.matched <= 0)) {
+      setToast("Run Smart Matching and ensure every vegetable has supply.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const response = await fetch("/api/pools", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items: currentMatches }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not create the Farm Pool.");
+      const created = data.order;
+      setSelectedTracking(created.orderCode);
+      setToast(`Order placed. Tracking ID ${created.orderCode}`);
+      navigate("track");
+      const refreshed = await fetch("/api/orders");
+      if (refreshed.ok) {
+        const orderData = await refreshed.json();
+        const next = orderData.orders?.find((order: { orderCode: string }) => order.orderCode === created.orderCode);
+        if (next) setOrders((current) => [{ id: next.id, trackingId: next.orderCode, items: next.items.map((entry: { crop: string; quantityKg: number }) => ({ crop: entry.crop, quantity: entry.quantityKg })), farmers: [...new Set(next.farmPool.members.map((member: { produce: { farmer: { name: string } } }) => member.produce.farmer.name))] as string[], total: next.items.reduce((sum: number, entry: { quantityKg: number }) => sum + entry.quantityKg, 0), status: statusIndex(next.status), date: next.createdAt, contributions: next.farmPool.members.map((member: { contributionKg: number; produce: { crop: string; location: string; pricePerKg: number; farmer: { name: string } } }) => ({ farmer: member.produce.farmer.name, crop: member.produce.crop, quantity: member.contributionKg, price: member.produce.pricePerKg, location: member.produce.location })) }, ...current.filter((order) => order.trackingId !== next.orderCode)]);
+      }
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "Could not create the Farm Pool.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function placeCartOrder() {
+    if (!cart.length) {
+      setToast("Your cart is empty.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const response = await fetch("/api/orders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items: cart.map((item) => ({ listingId: item.listing.id, quantity: item.quantity })) }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not place the order.");
+      const created = data.order;
+      const order: FarmOrder = {
+        id: created.id,
+        trackingId: created.orderCode,
+        items: created.items.map((item: { crop: string; quantityKg: number }) => ({ crop: item.crop, quantity: item.quantityKg })),
+        farmers: [...new Set(created.items.map((item: { produce?: { farmer: { name: string } } | null }) => item.produce?.farmer.name).filter(Boolean))] as string[],
+        total: created.items.reduce((sum: number, item: { quantityKg: number }) => sum + item.quantityKg, 0),
+        totalAmount: created.totalAmount,
+        status: statusIndex(created.status),
+        date: created.createdAt,
+        contributions: created.items.filter((item: { produce?: { farmer: { name: string } } | null }) => item.produce).map((item: { produce: { farmer: { name: string }; location: string }; crop: string; quantityKg: number; pricePerKg: number }) => ({ farmer: item.produce.farmer.name, crop: item.crop, quantity: item.quantityKg, price: item.pricePerKg, location: item.produce.location })),
+      };
+      setOrders((current) => [order, ...current.filter((item) => item.trackingId !== order.trackingId)]);
+      const refreshedProduce = await fetch("/api/produce");
+      if (refreshedProduce.ok) {
+        const produceData = await refreshedProduce.json();
+        setListings((produceData.produce || []).map((item: { id: string; crop: string; quantityKg: number; pricePerKg: number; location: string; farmer: { name: string }; readyDate?: string; createdAt: string }) => ({ id: item.id, crop: item.crop, quantity: item.quantityKg, price: item.pricePerKg, location: item.location, farmer: item.farmer.name, ready: item.readyDate ? new Date(item.readyDate).toLocaleDateString() : new Date(item.createdAt).toLocaleDateString(), available: true })));
+      }
+      setCart([]);
+      setSelectedTracking(order.trackingId);
+      setToast(`Order ${order.trackingId} placed successfully.`);
+      navigate("orders");
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "Could not place the order.");
+    } finally {
+      setBusy(false);
+    }
   }
   if (!role)
     return (
@@ -391,7 +425,7 @@ export default function FarmFuseShell() {
             </select>
           </label>
           {role === "buyer" && (
-            <button className="cart-button" onClick={() => navigate("market")}>
+            <button className="cart-button" onClick={() => navigate("cart")}>
               Cart <b>{cart.length}</b>
             </button>
           )}
@@ -422,26 +456,14 @@ export default function FarmFuseShell() {
             setSearch={setSearch}
             cart={cart}
             onAddCart={(listing) => {
-              setCart((items) =>
-                items.some((item) => item.listing.id === listing.id)
-                  ? items.map((item) =>
-                      item.listing.id === listing.id
-                        ? { ...item, quantity: item.quantity + 50 }
-                        : item,
-                    )
-                  : [...items, { listing, quantity: 50 }],
-              );
+              setSelectedListing(listing);
+              navigate("product");
+            }}
+            onAddQuantity={(listing, quantity) => {
+              setCart((items) => items.some((item) => item.listing.id === listing.id) ? items.map((item) => item.listing.id === listing.id ? { ...item, quantity: Math.min(listing.quantity, item.quantity + quantity) } : item) : [...items, { listing, quantity }]);
               setToast(`${listing.crop} added to cart.`);
             }}
-            onCheckout={() => {
-              addOrder(
-                cart.map((item) => ({
-                  crop: item.listing.crop,
-                  quantity: item.quantity,
-                })),
-              );
-              setCart([]);
-            }}
+            onCheckout={() => navigate("checkout")}
             onBulk={(crop) => {
               setRequirement((items) =>
                 items.some((item) => item.crop === crop)
@@ -452,12 +474,22 @@ export default function FarmFuseShell() {
             }}
           />
         )}{" "}
+        {view === "product" && role === "buyer" && selectedListing && (
+          <ProductDetails t={t} listing={selectedListing} onAdd={(quantity) => {
+            setCart((items) => items.some((item) => item.listing.id === selectedListing.id) ? items.map((item) => item.listing.id === selectedListing.id ? { ...item, quantity } : item) : [...items, { listing: selectedListing, quantity }]);
+            setToast(`${selectedListing.crop} added to cart.`);
+            navigate("cart");
+          }} />
+        )}{" "}
+        {view === "cart" && role === "buyer" && <CartView t={t} cart={cart} onChange={(listingId, quantity) => setCart((items) => items.map((item) => item.listing.id === listingId ? { ...item, quantity } : item))} onRemove={(listingId) => setCart((items) => items.filter((item) => item.listing.id !== listingId))} onCheckout={() => navigate("checkout")} onMarket={() => navigate("market")} />}{" "}
+        {view === "checkout" && role === "buyer" && <Checkout t={t} cart={cart} busy={busy} onBack={() => navigate("cart")} onPlaceOrder={placeCartOrder} />}{" "}
         {view === "sell" && role === "farmer" && (
           <Sell
             t={t}
             listings={listings}
             setListings={setListings}
             setToast={setToast}
+            userName={userName}
             onOrders={() => navigate("orders")}
           />
         )}{" "}
@@ -466,23 +498,39 @@ export default function FarmFuseShell() {
             t={t}
             role={role}
             requirement={requirement}
+            orders={orders}
             setRequirement={setRequirement}
-            onMatch={() => setToast("Smart matching found 4 suitable farmers.")}
-            onPool={() => addOrder()}
+            matches={matches}
+            setMatches={setMatches}
+            busy={busy}
+            onMatch={async () => {
+              setBusy(true);
+              try {
+                const response = await fetch("/api/matching", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items: requirement }) });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || "Matching failed.");
+                setMatches(data.items);
+              } catch (error) { setToast(error instanceof Error ? error.message : "Matching failed."); } finally { setBusy(false); }
+            }}
+            onPool={() => addOrder(requirement, matches)}
+            onStatus={async (order, status) => {
+              const response = await fetch("/api/orders", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ orderCode: order.trackingId, status }) });
+              if (!response.ok) { setToast((await response.json()).error || "Could not update order."); return; }
+              setOrders((current) => current.map((item) => item.trackingId === order.trackingId ? { ...item, status: statusIndex(status) } : item));
+              setToast(`Order ${order.trackingId} is now ${statusLabel(status)}.`);
+            }}
           />
         )}{" "}
         {view === "track" && (
           <Tracking
             order={activeOrder}
-            onAdvance={() => {
+            onAdvance={async () => {
               if (!activeOrder) return;
-              setOrders((items) =>
-                items.map((item) =>
-                  item.id === activeOrder.id
-                    ? { ...item, status: Math.min(6, item.status + 1) }
-                    : item,
-                ),
-              );
+              const statuses = ["ORDER_PLACED", "MATCHED", "COLLECTION", "COLLECTION_POINT", "CONSOLIDATION", "DISPATCHED", "DELIVERED"];
+              const nextStatus = statuses[Math.min(6, activeOrder.status + 1)];
+              const response = await fetch("/api/orders", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ orderCode: activeOrder.trackingId, status: nextStatus }) });
+              if (!response.ok) { setToast("Could not update this order status."); return; }
+              setOrders((items) => items.map((item) => item.id === activeOrder.id ? { ...item, status: Math.min(6, item.status + 1) } : item));
             }}
           />
         )}{" "}
@@ -594,26 +642,15 @@ function Landing({
               {t.buyNow}
             </button>
           </div>
-          <div className="hero-proof">
-            <span>
-              <strong>24k+</strong> kg connected supply
-            </span>
-            <span>
-              <strong>1,280</strong> farmer partners
-            </span>
-            <span>
-              <strong>32%</strong> route reduction*
-            </span>
-          </div>
         </div>
         <div className="hero-visual">
           <div className="floating-note note-top">
-            <span>Incoming supply</span>
-            <strong>Fresh produce is arriving</strong>
-            <small>Tomato · 4,200 kg from Nashik</small>
+            <span>Database-backed workflow</span>
+            <strong>Publish, match, pool and track</strong>
+            <small>Every quantity comes from a saved listing or order.</small>
           </div>
           <div className="floating-note note-bottom">
-            <span className="pulse" /> Smart matching active{" "}
+            <span className="pulse" /> Explainable matching{" "}
             <ArrowRight size={15} />
           </div>
         </div>
@@ -740,6 +777,39 @@ function PageHeader({
     </div>
   );
 }
+function ProductDetails({ t, listing, onAdd }: { t: Copy; listing: Listing; onAdd: (quantity: number) => void }) {
+  const [quantity, setQuantity] = useState("1");
+  const amount = Number(quantity);
+  const valid = Number.isFinite(amount) && amount > 0 && amount <= listing.quantity;
+  return (
+    <div className="content">
+      <PageHeader eyebrow={t.productDetails} title={listing.crop} detail={`${listing.quantity} kg available from ${listing.farmer}.`} />
+      <div className="panel form-panel">
+        <div className="listing-meta"><span><Package size={15} /> {listing.quantity} kg available</span><span><MapPin size={15} /> {listing.location}</span><span><Sprout size={15} /> {listing.farmer}</span></div>
+        <h2>₹{listing.price}/kg</h2>
+        <label>{t.quantity} (kg)<input type="number" min="1" max={listing.quantity} value={quantity} onChange={(event) => setQuantity(event.target.value)} /></label>
+        {!valid && <p className="auth-error">Enter a quantity from 1 to {listing.quantity} kg.</p>}
+        <button className="button primary" disabled={!valid} onClick={() => onAdd(amount)}>{t.addToCart} <ShoppingBasket size={16} /></button>
+      </div>
+    </div>
+  );
+}
+function CartView({ t, cart, onChange, onRemove, onCheckout, onMarket }: { t: Copy; cart: CartItem[]; onChange: (id: string, quantity: number) => void; onRemove: (id: string) => void; onCheckout: () => void; onMarket: () => void }) {
+  const total = cart.reduce((sum, item) => sum + item.quantity * item.listing.price, 0);
+  return (
+    <div className="content">
+      <PageHeader eyebrow={t.cart} title="Review your produce" detail="Quantities and prices are carried into checkout exactly as selected." />
+      {cart.length === 0 ? <><Empty text={t.emptyCart} /><button className="button primary" onClick={onMarket}>{t.market} <ArrowRight size={16} /></button></> : <div className="panel order-items">
+        {cart.map((item) => <div className="item-line" key={item.listing.id}><span>{cropIcons[item.listing.crop]} {item.listing.crop} · {item.listing.farmer}<small> ₹{item.listing.price}/kg</small></span><input aria-label={`${item.listing.crop} quantity`} type="number" min="1" max={item.listing.quantity} value={item.quantity} onChange={(event) => { const value = Number(event.target.value); if (value >= 1 && value <= item.listing.quantity) onChange(item.listing.id, value); }} /><strong>₹{(item.quantity * item.listing.price).toLocaleString()}</strong><button title="Remove product" onClick={() => onRemove(item.listing.id)}><Trash2 size={15} /></button></div>)}
+        <div className="requirement-total"><span>{t.total}</span><strong>₹{total.toLocaleString()}</strong></div><button className="button primary" onClick={onCheckout}>{t.checkout} <ArrowRight size={16} /></button>
+      </div>}
+    </div>
+  );
+}
+function Checkout({ t, cart, busy, onBack, onPlaceOrder }: { t: Copy; cart: CartItem[]; busy: boolean; onBack: () => void; onPlaceOrder: () => void }) {
+  const total = cart.reduce((sum, item) => sum + item.quantity * item.listing.price, 0);
+  return <div className="content"><PageHeader eyebrow={t.checkout} title="Confirm your order" detail="No payment is processed in this prototype." /><div className="panel order-items">{cart.length === 0 ? <Empty text={t.emptyCart} /> : <>{cart.map((item) => <div className="item-line" key={item.listing.id}><span>{item.listing.crop} · {item.quantity} kg · ₹{item.listing.price}/kg</span><strong>₹{(item.quantity * item.listing.price).toLocaleString()}</strong></div>)}<div className="requirement-total"><span>{t.total}</span><strong>₹{total.toLocaleString()}</strong></div><div className="button-row"><button className="button light" onClick={onBack}>{t.cart}</button><button className="button primary" disabled={busy} onClick={onPlaceOrder}>{busy ? "Placing..." : t.placeOrder} <Check size={16} /></button></div></>}</div></div>;
+}
 function Marketplace({
   t,
   listings,
@@ -747,6 +817,7 @@ function Marketplace({
   setSearch,
   cart,
   onAddCart,
+  onAddQuantity,
   onCheckout,
   onBulk,
 }: {
@@ -756,6 +827,7 @@ function Marketplace({
   setSearch: (value: string) => void;
   cart: CartItem[];
   onAddCart: (listing: Listing) => void;
+  onAddQuantity: (listing: Listing, quantity: number) => void;
   onCheckout: () => void;
   onBulk: (crop: string) => void;
 }) {
@@ -850,11 +922,14 @@ function Marketplace({
                   >
                     Bulk request
                   </button>
+                  <button className="button light" onClick={() => onAddQuantity(listing, 1)} disabled={listing.quantity < 1}>
+                    Add 1 kg <Plus size={15} />
+                  </button>
                   <button
                     className="button primary"
                     onClick={() => onAddCart(listing)}
                   >
-                    Add to cart <Plus size={15} />
+                    View details <ArrowRight size={15} />
                   </button>
                 </div>
               </div>
@@ -870,12 +945,14 @@ function Sell({
   listings,
   setListings,
   setToast,
+  userName,
   onOrders,
 }: {
   t: Copy;
   listings: Listing[];
   setListings: (items: Listing[]) => void;
   setToast: (value: string) => void;
+  userName: string;
   onOrders: () => void;
 }) {
   const [form, setForm] = useState({
@@ -885,18 +962,13 @@ function Sell({
     location: "Nashik, Maharashtra",
     ready: "Today",
   });
-  const mine = listings.filter((item) => item.farmer === "Arjun Patil");
-  function publish(event: React.FormEvent) {
+  const mine = listings.filter((item) => item.farmer === userName);
+  async function publish(event: React.FormEvent) {
     event.preventDefault();
-    const listing = {
-      ...form,
-      id: `listing-${Date.now()}`,
-      quantity: Number(form.quantity),
-      price: Number(form.price),
-      farmer: "Arjun Patil",
-      available: true,
-    };
-    setListings([...listings, listing]);
+    const response = await fetch("/api/produce", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ crop: form.crop, quantity: Number(form.quantity), price: Number(form.price), location: form.location, ready: form.ready }) });
+    const data = await response.json();
+    if (!response.ok) { setToast(data.error || "Could not publish produce."); return; }
+    setListings([...listings, { id: data.produce.id, crop: data.produce.crop, quantity: data.produce.quantityKg, price: data.produce.pricePerKg, location: data.produce.location, farmer: userName, ready: form.ready, available: true }]);
     setToast(`${form.crop} is now visible to buyers.`);
   }
   return (
@@ -917,9 +989,9 @@ function Sell({
           label="Current stock"
           value={`${mine.reduce((sum, item) => sum + item.quantity, 0).toLocaleString()} kg`}
         />
-        <Stat icon={<ClipboardList />} label="Open orders" value="08" />
-        <Stat icon={<Users />} label="Buyer requests" value="04" />
-        <Stat icon={<Truck />} label="Active deliveries" value="02" />
+        <Stat icon={<ClipboardList />} label="Published listings" value={String(mine.filter((item) => item.available).length)} />
+        <Stat icon={<Users />} label="Paused listings" value={String(mine.filter((item) => !item.available).length)} />
+        <Stat icon={<Truck />} label="Orders" value="View orders" />
       </div>
       <div className="farmer-actions">
         <button
@@ -1022,31 +1094,28 @@ function Sell({
                       {listing.quantity} kg · ₹{listing.price}/kg
                     </small>
                   </div>
-                  <button title="Edit listing">
+                  <button title="Edit listing" onClick={async () => {
+                    const quantity = window.prompt("New quantity in kg", String(listing.quantity));
+                    const price = window.prompt("New price per kg", String(listing.price));
+                    if (!quantity || !price) return;
+                    const response = await fetch("/api/produce", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: listing.id, quantity: Number(quantity), price: Number(price) }) });
+                    if (response.ok) setListings(listings.map((item) => item.id === listing.id ? { ...item, quantity: Number(quantity), price: Number(price) } : item));
+                    setToast(response.ok ? "Listing updated." : "Could not update listing.");
+                  }}>
                     <Pencil size={15} />
                   </button>
-                  <button
-                    title="Pause listing"
-                    onClick={() =>
-                      setListings(
-                        listings.map((item) =>
-                          item.id === listing.id
-                            ? { ...item, available: false }
-                            : item,
-                        ),
-                      )
-                    }
-                  >
+                  <button title="Pause listing" onClick={async () => {
+                    const response = await fetch("/api/produce", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: listing.id, available: false }) });
+                    if (response.ok) setListings(listings.map((item) => item.id === listing.id ? { ...item, available: false } : item));
+                    setToast(response.ok ? "Listing paused." : "Could not pause listing.");
+                  }}>
                     <Pause size={15} />
                   </button>
-                  <button
-                    title="Remove listing"
-                    onClick={() =>
-                      setListings(
-                        listings.filter((item) => item.id !== listing.id),
-                      )
-                    }
-                  >
+                  <button title="Remove listing" onClick={async () => {
+                    const response = await fetch(`/api/produce?id=${encodeURIComponent(listing.id)}`, { method: "DELETE" });
+                    if (response.ok) setListings(listings.map((item) => item.id === listing.id ? { ...item, available: false } : item));
+                    setToast(response.ok ? "Listing removed from marketplace." : "Could not remove listing.");
+                  }}>
                     <Trash2 size={15} />
                   </button>
                 </div>
@@ -1081,23 +1150,28 @@ function Orders({
   t,
   role,
   requirement,
+  orders,
   setRequirement,
+  matches,
+  setMatches,
+  busy,
   onMatch,
   onPool,
+  onStatus,
 }: {
   t: Copy;
   role: Role;
   requirement: RequirementItem[];
+  orders: FarmOrder[];
   setRequirement: (items: RequirementItem[]) => void;
+  matches: MatchItem[];
+  setMatches: (items: MatchItem[]) => void;
+  busy: boolean;
   onMatch: () => void;
   onPool: () => void;
+  onStatus: (order: FarmOrder, status: string) => void;
 }) {
-  const matches = [
-    { name: "Arjun Patil", location: "Nashik", contribution: 250 },
-    { name: "Meera Shinde", location: "Dhule", contribution: 200 },
-    { name: "Suresh Jadhav", location: "Jalgaon", contribution: 300 },
-    { name: "Kavita More", location: "Nandurbar", contribution: 250 },
-  ];
+  useEffect(() => setMatches([]), [requirement, setMatches]);
   if (role === "farmer")
     return (
       <div className="content">
@@ -1107,40 +1181,24 @@ function Orders({
           detail="See the buyer demand connected to your listings."
         />
         <div className="farmer-order-list">
-          <article className="panel">
+          {orders.length === 0 && <Empty text="No orders include your published produce yet." />}
+            {orders.map((order) => <article className="panel" key={order.trackingId}>
             <div className="panel-heading">
               <div>
-                <span className="eyebrow">Buyer request</span>
-                <h2>Tomato pool · 1,000 kg</h2>
+                <span className="eyebrow">FarmFuse Tracking ID</span>
+                <h2>{order.trackingId}</h2>
               </div>
-              <span className="status-pill">Open for matching</span>
+              <span className="status-pill">{statusLabel(["PENDING", "ACCEPTED", "PREPARING", "READY", "COMPLETED", "REJECTED", "ORDER_PLACED", "MATCHED", "COLLECTION", "COLLECTION_POINT", "CONSOLIDATION", "DISPATCHED", "DELIVERED"][order.status] || "PENDING")}</span>
             </div>
-            <p className="muted">
-              Collection point: Dhule market yard · Required by 18 Sep
-            </p>
-            <div className="fulfilled">
-              <span>Your possible contribution</span>
-              <strong>250 kg</strong>
-            </div>
-            <button className="button primary" onClick={() => onMatch()}>
-              Join this Farm Pool <Users size={16} />
-            </button>
-          </article>
-          <article className="panel">
-            <div className="panel-heading">
-              <div>
-                <span className="eyebrow">Your delivery</span>
-                <h2>FF-7K29M4</h2>
-              </div>
-              <span className="status-pill success">Ready for collection</span>
-            </div>
-            <p className="muted">
-              Your contribution: 250 kg Tomato · Collection hub: Dhule
-            </p>
-            <button className="button light" onClick={() => onMatch()}>
-              View collection details <ArrowRight size={16} />
-            </button>
-          </article>
+            {order.contributions?.map((entry) => <p className="muted" key={`${order.trackingId}-${entry.farmer}-${entry.crop}`}>{entry.farmer}: {entry.quantity} kg {entry.crop} · ₹{entry.price}/kg · {entry.location}</p>)}
+            {order.status <= 4 && <div className="button-row">
+              {(order.status === 0) && <><button className="button primary" onClick={() => onStatus(order, "ACCEPTED")}>Accept</button><button className="button light" onClick={() => onStatus(order, "REJECTED")}>Reject</button></>}
+              {order.status === 1 && <button className="button primary" onClick={() => onStatus(order, "PREPARING")}>Mark preparing</button>}
+              {order.status === 2 && <button className="button primary" onClick={() => onStatus(order, "READY")}>Mark ready</button>}
+              {order.status === 3 && <button className="button primary" onClick={() => onStatus(order, "COMPLETED")}>Mark completed</button>}
+            </div>}
+            <button className="button light" onClick={() => onMatch()}>View collection details <ArrowRight size={16} /></button>
+          </article>)}
         </div>
       </div>
     );
@@ -1161,6 +1219,10 @@ function Orders({
           </button>
         }
       />
+      {orders.length > 0 && <div className="farmer-order-list">
+        <div className="panel-heading"><h2>My orders</h2><span className="eyebrow">Synced from the database</span></div>
+        {orders.map((order) => <article className="panel" key={order.trackingId}><div className="panel-heading"><div><span className="eyebrow">{order.trackingId}</span><h2>{order.items.map((item) => `${item.crop} ${item.quantity} kg`).join(" · ")}</h2></div><span className="status-pill">{statusLabel(["PENDING", "ACCEPTED", "PREPARING", "READY", "COMPLETED", "REJECTED", "ORDER_PLACED", "MATCHED", "COLLECTION", "COLLECTION_POINT", "CONSOLIDATION", "DISPATCHED", "DELIVERED"][order.status] || "PENDING")}</span></div><p className="muted">Total: ₹{(order.totalAmount ?? 0).toLocaleString()} · {new Date(order.date).toLocaleString()}</p>{order.contributions?.map((entry) => <p className="muted" key={`${order.trackingId}-${entry.farmer}-${entry.crop}`}>Farmer: {entry.farmer} · {entry.quantity} kg · ₹{entry.price}/kg</p>)}</article>)}
+      </div>}
       <div className="workspace-columns">
         <div className="panel">
           <div className="panel-heading">
@@ -1245,43 +1307,33 @@ function Orders({
           <div className="panel-heading">
             <div>
               <span className="eyebrow">Smart matching</span>
-              <h2>Suitable farmers found</h2>
+              <h2>Actual available supply</h2>
             </div>
-            <span className="match-score">96%</span>
+            <span className="match-score">{matches.length ? `${Math.round(matches.reduce((sum, item) => sum + item.fulfillment, 0) / matches.length)}%` : "--"}</span>
           </div>
           <p className="muted">
-            AI-assisted matching weighs available quantity, price, freshness and
-            collection distance. It supports decisions; it does not replace the
-            farmers.
+            Explainable ranking uses available quantity, price, location and ready date. It is deterministic prototype logic, not a trained model.
           </p>
           <div className="match-bars">
-            {matches.map((match) => (
-              <div className="match-row" key={match.name}>
-                <span>
-                  <strong>{match.name}</strong>
-                  <small>
-                    {match.location} · {match.contribution} kg
-                  </small>
-                </span>
-                <div>
-                  <i
-                    style={{ width: `${(match.contribution / 300) * 100}%` }}
-                  />
-                </div>
+            {matches.length === 0 ? <Empty text="Change the requirement, then run Smart Matching." /> : matches.map((item) => (
+              <div className="match-crop" key={item.crop}>
+                <div className="panel-heading"><strong>{cropIcons[item.crop]} {item.crop}</strong><span>{item.matched} / {item.required} kg · {item.fulfillment}%</span></div>
+                {item.selected.map((match) => <div className="match-row" key={match.id}><span><strong>{match.name}</strong><small>{match.location} · {match.contribution} kg · ₹{match.price}/kg · ready {match.ready ? new Date(match.ready).toLocaleDateString() : "date not supplied"}</small></span><div><i style={{ width: `${Math.min((match.contribution / item.required) * 100, 100)}%` }} /></div></div>)}
+                <small className="muted">Remaining: {item.remaining} kg</small>
               </div>
             ))}
           </div>
           <div className="fulfilled">
-            <span>1,000 / 1,000 kg matched</span>
-            <strong>100% fulfilled</strong>
+            <span>{matches.reduce((sum, item) => sum + item.matched, 0)} / {matches.reduce((sum, item) => sum + item.required, 0)} kg matched</span>
+            <strong>{matches.length && matches.every((item) => item.remaining === 0) ? "100% fulfilled" : "Supply insufficient"}</strong>
           </div>
-          <button className="button primary full-button" onClick={onPool}>
+          <button className="button primary full-button" disabled={busy || !matches.length || matches.some((item) => item.remaining > 0)} onClick={onPool}>
             {t.pool} <ArrowRight size={16} />
           </button>
         </div>
       </div>
       <div className="pool-story">
-        <span className="eyebrow">Farm Pool FF-7K29M4</span>
+        <span className="eyebrow">Current Farm Pool path</span>
         <div>
           <b>Multiple farmers</b>
           <ArrowRight />
@@ -1399,18 +1451,8 @@ function Tracking({
   );
 }
 function RouteMap({ order }: { order: FarmOrder }) {
-  const locations: Record<string, string> = {
-    "Arjun Patil": "Nashik",
-    "Meera Shinde": "Dhule",
-    "Suresh Jadhav": "Jalgaon",
-    "Kavita More": "Nandurbar",
-    "Rohan Deshmukh": "Pune",
-    "Priya Raut": "Aurangabad",
-  };
-  const farmers = order.farmers.length ? order.farmers : ["Nearby farm"];
-  const baseQuantity = Math.floor(order.total / farmers.length);
-  const routeStart = 104 + farmers.length * 11;
-  const routeEnd = 68 + farmers.length * 7;
+  const contributions = order.contributions || [];
+  const farmers = contributions.length ? contributions : order.farmers.map((farmer) => ({ farmer, location: "Location saved on order", quantity: 0, crop: "Produce", price: 0 }));
   return (
     <div className="panel">
       <div className="panel-heading">
@@ -1424,10 +1466,10 @@ function RouteMap({ order }: { order: FarmOrder }) {
         <div className="route-path path-one" />
         <div className="route-path path-two" />
         <div className="route-path path-three" />
-        {farmers.map((farmer, index) => (
-          <div className={`map-pin farm-pin-${index % 4}`} key={farmer}>
+        {farmers.map((entry, index) => (
+          <div className={`map-pin farm-pin-${index % 4}`} key={`${entry.farmer}-${entry.crop}`}>
             {index % 2 === 0 ? "👨‍🌾" : "👩‍🌾"}
-            <small>{farmer} · {index === farmers.length - 1 ? order.total - baseQuantity * (farmers.length - 1) : baseQuantity} kg · {locations[farmer] || "Nearby"}</small>
+            <small>{entry.farmer} · {entry.quantity} kg {entry.crop} · {entry.location}</small>
           </div>
         ))}
         <div className="map-pin hub-pin">
@@ -1439,21 +1481,21 @@ function RouteMap({ order }: { order: FarmOrder }) {
       </div>
       <div className="route-callout">
         <strong>Suggested collection route</strong>
-        <span>
-          {routeStart} km <ArrowRight size={14} /> <b>{routeEnd} km</b>
-        </span>
-        <small>Illustrative route calculation for this order · {Math.round(((routeStart - routeEnd) / routeStart) * 100)}% potential reduction</small>
+        <span>Selected farmer locations <ArrowRight size={14} /> <b>Collection hub</b> <ArrowRight size={14} /> Buyer</span>
+        <small>Illustrative route calculation using the actual farmers selected for this order. No live GPS or traffic data.</small>
       </div>
     </div>
   );
 }
 function Intelligence() {
+  const sampleDemand = [120, 145, 138, 170, 184, 196];
+  const forecast = Math.round(sampleDemand.slice(-3).reduce((sum, value) => sum + value, 0) / 3);
   return (
     <div className="content">
       <PageHeader
         eyebrow="FarmFuse Intelligence"
         title="The intelligence stays behind the experience."
-        detail="Simple signals help farmers plan and help buyers source with confidence."
+        detail="Prototype calculations are shown with their inputs and are not live market predictions."
       />
       <div className="intelligence-grid">
         <article className="intel-card">
@@ -1461,35 +1503,21 @@ function Intelligence() {
             <Zap />
           </div>
           <span className="eyebrow">01 / Demand forecasting</span>
-          <h2>Tomato demand is rising next week.</h2>
+          <h2>Tomato demand forecast</h2>
           <div className="chart">
-            <i style={{ height: "35%" }} />
-            <i style={{ height: "52%" }} />
-            <i style={{ height: "48%" }} />
-            <i style={{ height: "76%" }} />
-            <i style={{ height: "91%" }} />
-            <i style={{ height: "84%" }} />
+            {sampleDemand.map((value) => <i key={value} style={{ height: `${(value / 220) * 100}%` }} />)}
           </div>
-          <p>
-            Current connected supply covers 82% of projected demand. Farmers can
-            plan the next harvest with a clearer signal.
-          </p>
+          <p>Sample historical demand: {sampleDemand.join(", ")} kg. Current sample demand: {sampleDemand.at(-1)} kg. Simple forecast: {forecast} kg based on the recent average.</p>
         </article>
         <article className="intel-card">
           <div className="intel-icon peach">
             <Users />
           </div>
           <span className="eyebrow">02 / Smart farmer matching</span>
-          <h2>Four farms can fulfil one larger order.</h2>
-          <div className="big-number">
-            1,000 <small>kg</small>
-          </div>
-          <div className="mini-progress">
-            <i />
-          </div>
+          <h2>Availability-first matching</h2>
+          <div className="big-number">Actual <small>data</small></div>
           <p>
-            Matches balance quantity, price, freshness and collection distance.
-            The final choice stays transparent.
+            Each crop is matched separately using available quantity, price, location and ready date. Contributions stop at the requested quantity.
           </p>
         </article>
         <article className="intel-card">
@@ -1497,16 +1525,10 @@ function Intelligence() {
             <Truck />
           </div>
           <span className="eyebrow">03 / Route optimization</span>
-          <h2>Consolidate collection before the last mile.</h2>
-          <div className="route-number">
-            <strong>142</strong>
-            <ArrowRight />
-            <strong>96</strong>
-            <small>km illustrative route</small>
-          </div>
+          <h2>Selected farmers to collection hub to buyer.</h2>
+          <div className="route-number"><strong>Illustrative</strong><ArrowRight /><strong>route</strong><small>Calculated from selected farmer locations</small></div>
           <p>
-            Multiple farm pickups become one coordinated movement to a
-            collection hub and then the buyer.
+            Logistics uses the farmers saved on the order. It does not claim live GPS, traffic or vehicle tracking.
           </p>
         </article>
       </div>
@@ -1578,7 +1600,7 @@ function Home({
             <button onClick={() => onNavigate("orders")}>
               <Truck />
               <span>
-                <strong>Incoming supply and deliveries</strong>
+                <strong>Orders and deliveries</strong>
                 <small>Review requirements, farm pools and your order journey.</small>
               </span>
               <ArrowRight />

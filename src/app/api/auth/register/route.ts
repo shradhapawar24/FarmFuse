@@ -3,6 +3,13 @@ import { hash } from "bcryptjs";
 import { Prisma } from "@prisma/client";
 import { prisma, databaseConfigured } from "@/lib/prisma";
 
+function safeErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return message
+    .replace(/([a-z][a-z0-9+.-]*:\/\/)[^\s"']+/gi, "$1[REDACTED_URL]")
+    .replace(/(password|passwd|secret|token|api[_-]?key|access[_-]?key)(\s*[:=]\s*)[^\s,;}]+/gi, "$1$2[REDACTED]")
+    .slice(0, 1000);
+}
 export async function POST(request: Request) {
   try {
     if (!databaseConfigured()) return NextResponse.json({ error: "Account creation is unavailable until the database is configured." }, { status: 503 });
@@ -29,7 +36,11 @@ export async function POST(request: Request) {
     console.error("[auth/register] Registration failed", {
       name: error instanceof Error ? error.name : "UnknownError",
       code: error instanceof Prisma.PrismaClientKnownRequestError ? error.code : undefined,
+      message: safeErrorMessage(error),
+      databaseUrlPresent: Boolean(process.env.DATABASE_URL),
+      prismaClientVersion: Prisma.prismaVersion.client,
     });
     return NextResponse.json({ error: "Unable to create the account right now." }, { status: 500 });
   }
 }
+
